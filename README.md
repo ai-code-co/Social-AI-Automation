@@ -9,7 +9,9 @@ Social AI Automation is a multi-business social media content dashboard that use
 - Configure default content topics, hashtags, tone, audience, and brand voice
 - Choose enabled platforms per business, such as Instagram, Facebook, LinkedIn, TikTok, YouTube, and Twitter
 - Generate single posts with AI
+- Generate post images from the AI-created image prompts
 - Generate batch posts from each business's default topics
+- Connect Facebook Page and Instagram Business accounts for scheduled publishing
 - Review, approve, pause, and delete posts
 - Light and dark UI themes
 
@@ -17,7 +19,7 @@ Social AI Automation is a multi-business social media content dashboard that use
 
 - Frontend: React, Vite, Tailwind CSS, lucide-react
 - Backend: FastAPI, SQLAlchemy, PostgreSQL
-- AI: OpenAI API
+- AI: OpenAI API for captions, Pollinations for development image generation
 - Scheduler: APScheduler
 
 ## Project Structure
@@ -48,6 +50,18 @@ DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/social_ai
 REDIS_URL=redis://localhost:6379/0
 SECRET_KEY=your_secret_key
 DEBUG=true
+IMAGE_GENERATION_ENABLED=true
+IMAGE_PROVIDER=pollinations
+POLLINATIONS_API_KEY=your_free_pollinations_api_key
+IMAGE_MODEL=flux
+IMAGE_SIZE=1024x1024
+IMAGE_ENHANCE=false
+IMAGE_SAFE=true
+PUBLIC_APP_URL=https://your-public-app-url.example.com
+META_GRAPH_VERSION=v24.0
+META_APP_ID=your_meta_app_id
+META_APP_SECRET=your_meta_app_secret
+META_REDIRECT_URI=http://localhost:8000/social-accounts/meta/callback
 ```
 
 ## Backend Setup
@@ -105,4 +119,6 @@ cd backend
 
 ## Notes
 
-The app currently generates and manages social posts, but direct publishing to social media platform APIs is not implemented yet. Scheduled publishing can be added later by connecting platform APIs and running a publisher job for due posts.
+Scheduled publishing currently supports Facebook Pages and Instagram Business accounts through Meta Graph API tokens. During development, add the Page ID or Instagram user ID and a long-lived access token in the Social tab. The scheduler checks for due posts every minute and publishes posts with `scheduled` status.
+
+Instagram image publishing requires `PUBLIC_APP_URL` so Meta can fetch the generated image over public HTTPS. Facebook posts can publish as text-only if no public image URL is configured.

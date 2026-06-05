@@ -1,6 +1,8 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from app.tasks.post_tasks import auto_generate_posts
+from app.tasks.publish_tasks import publish_due_posts
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,13 @@ def start_scheduler():
         auto_generate_posts,
         trigger=CronTrigger(day_of_week="mon", hour=9, minute=0),
         id="weekly_post_generation",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        publish_due_posts,
+        trigger=IntervalTrigger(minutes=1),
+        id="publish_due_posts",
         replace_existing=True,
     )
 

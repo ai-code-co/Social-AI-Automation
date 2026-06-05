@@ -1,7 +1,15 @@
-import { AtSign, Briefcase, Check, Clock, FileText, Globe2, Pause, Share2, Trash2, Video } from 'lucide-react';
-import { approvePost, pausePost, deletePost } from '../api';
+import { useState } from 'react';
+import { AtSign, Briefcase, CalendarClock, Check, Clock, ExternalLink, FileText, Globe2, Pause, Share2, Trash2, Video } from 'lucide-react';
+import { API_BASE_URL, approvePost, pausePost, deletePost, updatePost } from '../api';
+
+const getMediaUrl = (url) => {
+  if (!url) return '';
+  return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+};
 
 export default function PostCard({ post, onRefresh }) {
+  const [scheduledAt, setScheduledAt] = useState('');
+
   const statusColors = {
     draft: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
     pending_approval: 'bg-amber-50 text-amber-700 ring-amber-200',
@@ -38,6 +46,20 @@ export default function PostCard({ post, onRefresh }) {
     }
   };
 
+  const handleSchedule = async () => {
+    if (!scheduledAt) {
+      alert('Choose a publish date and time');
+      return;
+    }
+
+    await updatePost(post.id, {
+      status: 'scheduled',
+      scheduled_at: scheduledAt,
+    });
+    setScheduledAt('');
+    onRefresh();
+  };
+
   const PlatformIcon = platformIcons[post.platform] || Globe2;
 
   return (
@@ -54,6 +76,15 @@ export default function PostCard({ post, onRefresh }) {
         </span>
       </div>
 
+      {post.image_url && (
+        <img
+          src={getMediaUrl(post.image_url)}
+          alt={post.image_prompt || 'Generated post visual'}
+          className="aspect-square w-full rounded-md border border-slate-100 object-cover dark:border-slate-800"
+          loading="lazy"
+        />
+      )}
+
       <p className="line-clamp-5 text-sm leading-6 text-slate-700 dark:text-slate-300">{post.caption}</p>
 
       {post.hashtags && (
@@ -69,6 +100,47 @@ export default function PostCard({ post, onRefresh }) {
           <Clock size={13} aria-hidden="true" />
           Scheduled: {new Date(post.scheduled_at).toLocaleString()}
         </p>
+      )}
+
+      {post.error_log && (
+        <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-700">
+          {post.error_log}
+        </p>
+      )}
+
+      {post.platform_post_url && (
+        <a
+          href={post.platform_post_url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 text-xs font-medium text-sky-700 transition hover:bg-sky-100"
+        >
+          <ExternalLink size={14} aria-hidden="true" />
+          View published post
+        </a>
+      )}
+
+      {['draft', 'pending_approval', 'approved', 'failed'].includes(post.status) && (
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+          <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+            <CalendarClock size={13} aria-hidden="true" />
+            Publish date
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={e => setScheduledAt(e.target.value)}
+              className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-950 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <button
+              onClick={handleSchedule}
+              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-medium text-white transition hover:bg-slate-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+            >
+              Schedule
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="mt-auto flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">

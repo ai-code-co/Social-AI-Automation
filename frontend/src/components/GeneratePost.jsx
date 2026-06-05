@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Hash, Image, Loader2, Megaphone, PenLine, Send, Sparkles } from 'lucide-react';
-import { generatePost } from '../api';
+import { API_BASE_URL, generatePost } from '../api';
 
 const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube'];
 
@@ -10,6 +10,11 @@ const getEnabledPlatforms = (brand) => (
     .map(platform => platform.trim().toLowerCase())
     .filter(Boolean)
 );
+
+const getMediaUrl = (url) => {
+  if (!url) return '';
+  return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+};
 
 export default function GeneratePost({ brand }) {
   const [form, setForm] = useState({
@@ -40,7 +45,7 @@ export default function GeneratePost({ brand }) {
     try {
       const res = await generatePost({ ...form, brand_id: brand.id });
       setResult(res.data);
-    } catch (err) {
+    } catch {
       alert('Error generating post');
     } finally {
       setLoading(false);
@@ -157,6 +162,13 @@ export default function GeneratePost({ brand }) {
               Post generated and saved
             </h3>
             <div className="mt-4 space-y-4">
+              {result.image_url && (
+                <img
+                  src={getMediaUrl(result.image_url)}
+                  alt={result.image_prompt || 'Generated post visual'}
+                  className="aspect-square w-full rounded-md border border-emerald-100 object-cover shadow-sm dark:border-emerald-500/20"
+                />
+              )}
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Caption</p>
                 <p className="text-sm leading-6 text-slate-800 dark:text-slate-200">{result.caption}</p>

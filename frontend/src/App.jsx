@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Building2, Check, ChevronDown, Moon, Palette, PenLine, Rows3, Sun } from 'lucide-react';
+import { Building2, Check, ChevronDown, Link2, Moon, Palette, PenLine, Rows3, Sun } from 'lucide-react';
 import { getBrands } from './api';
 import Dashboard from './components/Dashboard';
 import BrandSettings from './components/BrandSettings';
 import GeneratePost from './components/GeneratePost';
+import SocialAccounts from './components/SocialAccounts';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -19,6 +20,7 @@ export default function App() {
   const tabs = [
     { id: 'dashboard', label: 'Posts', icon: Rows3 },
     { id: 'generate', label: 'Generate', icon: PenLine },
+    { id: 'social', label: 'Social', icon: Link2 },
     { id: 'brand', label: 'Businesses', icon: Palette },
   ];
 
@@ -179,6 +181,7 @@ export default function App() {
           <div className="rounded-lg border border-white/70 bg-white/90 p-4 shadow-2xl shadow-slate-900/10 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/30 sm:p-6">
             {activeTab === 'dashboard' && <Dashboard brand={selectedBrand} />}
             {activeTab === 'generate' && <GeneratePost brand={selectedBrand} />}
+            {activeTab === 'social' && <SocialAccounts brand={selectedBrand} />}
             {activeTab === 'brand' && (
               <BrandSettings
                 brands={brands}

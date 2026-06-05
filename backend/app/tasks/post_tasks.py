@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.base import SessionLocal
 from app.models.post import Post, PostStatus, Platform
 from app.models.brand import BrandSettings
+from app.services.image_service import get_post_image_url
 from app.services.openai_service import generate_post
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,8 @@ def auto_generate_posts(brand_id: int | None = None):
                     scheduled_at=scheduled_time,
                 )
                 db.add(post)
+                db.flush()
+                post.image_url = get_post_image_url(post.id)
                 posts_created += 1
 
         db.commit()

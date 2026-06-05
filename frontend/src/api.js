@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+export const API_BASE_URL = 'http://localhost:8000';
+
 const API = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: API_BASE_URL,
 });
 
 export const getPosts = (status, platform, brandId) =>
@@ -16,14 +18,14 @@ export const generateBatch = (brandId) =>
 export const approvePost = (id) =>
   API.post(`/posts/${id}/approve`);
 
+export const updatePost = (id, data) =>
+  API.put(`/posts/${id}`, data);
+
 export const approveAll = (brandId) =>
   API.post('/posts/approve-all', null, { params: { brand_id: brandId } });
 
 export const pausePost = (id) =>
   API.post(`/posts/${id}/pause`);
-
-export const updatePost = (id, data) =>
-  API.put(`/posts/${id}`, data);
 
 export const deletePost = (id) =>
   API.delete(`/posts/${id}`);
@@ -45,3 +47,18 @@ export const updateBrand = (id, data) =>
 
 export const deleteBrand = (id) =>
   API.delete(`/brands/${id}`);
+
+export const getSocialAccounts = (brandId) =>
+  API.get('/social-accounts/', { params: { brand_id: brandId } });
+
+export const saveSocialAccount = (data) =>
+  API.post('/social-accounts/', data);
+
+export const updateSocialAccount = (id, data) =>
+  API.put(`/social-accounts/${id}`, data);
+
+export const deleteSocialAccount = (id) =>
+  API.delete(`/social-accounts/${id}`);
+
+export const getMetaOAuthUrl = (brandId) =>
+  API.get('/social-accounts/meta/oauth-url', { params: { brand_id: brandId } });

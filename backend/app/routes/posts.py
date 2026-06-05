@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from app.models import get_db, Platform, Post, PostStatus
 from app.models.brand import BrandSettings
+from app.services.image_service import ImageGenerationError, fetch_generated_image, get_post_image_url
 from app.services.openai_service import generate_post
 from app.tasks.post_tasks import auto_generate_posts
 
@@ -103,6 +104,10 @@ def generate_and_save_post(request: GeneratePostRequest, db: Session = Depends(g
     db.add(post)
     db.commit()
     db.refresh(post)
+
+    post.image_url = get_post_image_url(post.id)
+    db.commit()
+    db.refresh(post)
     return post
 
 
@@ -155,6 +160,24 @@ def get_post(post_id: int, db: Session = Depends(get_db)):
     return post
 
 
+@router.get("/{post_id}/image")
+def get_post_image(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    try:
+        image_content, media_type = fetch_generated_image(post.image_prompt or "", seed=post.id)
+    except ImageGenerationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return Response(
+        content=image_content,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @router.post("/{post_id}/approve")
 def approve_post(post_id: int, db: Session = Depends(get_db)):
     post = db.query(Post).filter(Post.id == post_id).first()
@@ -196,6 +219,11 @@ def update_post(post_id: int, request: UpdatePostRequest, db: Session = Depends(
         post.scheduled_at = request.scheduled_at
     if request.status:
         post.status = request.status
+        if request.status == PostStatus.scheduled:
+            post.error_log = None
+            post.published_at = None
+            post.external_post_id = None
+            post.platform_post_url = None
 
     db.commit()
     db.refresh(post)

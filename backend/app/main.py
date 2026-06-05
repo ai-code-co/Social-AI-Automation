@@ -5,6 +5,7 @@ from app.config import settings
 from app.db_init import init_db
 from app.routes.posts import router as posts_router
 from app.routes.brand import router as brand_router
+from app.routes.social_accounts import router as social_accounts_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 @asynccontextmanager
@@ -35,6 +36,7 @@ app.add_middleware(
 
 app.include_router(posts_router)
 app.include_router(brand_router)
+app.include_router(social_accounts_router)
 
 @app.get("/")
 def health_check():

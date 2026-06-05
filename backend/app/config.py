@@ -12,6 +12,18 @@ class Settings(BaseSettings):
     redis_url: str
     secret_key: str
     debug: bool = True
+    image_generation_enabled: bool = True
+    image_provider: str = "pollinations"
+    pollinations_api_key: str | None = None
+    image_model: str = "flux"
+    image_size: str = "1024x1024"
+    image_enhance: bool = False
+    image_safe: bool = True
+    public_app_url: str | None = None
+    meta_graph_version: str = "v24.0"
+    meta_app_id: str | None = None
+    meta_app_secret: str | None = None
+    meta_redirect_uri: str | None = None
 
     @field_validator("debug", mode="before")
     @classmethod
