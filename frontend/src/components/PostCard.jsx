@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { AtSign, Briefcase, CalendarClock, Check, Clock, ExternalLink, FileText, Globe2, Pause, Share2, Trash2, Video } from 'lucide-react';
-import { API_BASE_URL, approvePost, pausePost, deletePost, updatePost } from '../api';
+import { AtSign, Briefcase, CalendarClock, Check, Clock, Edit3, ExternalLink, FileText, Globe2, Pause, Play, Save, Share2, Trash2, Video, X } from 'lucide-react';
+import { API_BASE_URL, approvePost, pausePost, resumePost, deletePost, updatePost } from '../api';
 
 const getMediaUrl = (url) => {
   if (!url) return '';
@@ -9,6 +9,12 @@ const getMediaUrl = (url) => {
 
 export default function PostCard({ post, onRefresh }) {
   const [scheduledAt, setScheduledAt] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
+  const [imagePromptVisible, setImagePromptVisible] = useState(false);
+  const [editCaption, setEditCaption] = useState(post.caption || '');
+  const [editHashtags, setEditHashtags] = useState(post.hashtags || '');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const statusColors = {
     draft: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
@@ -39,6 +45,11 @@ export default function PostCard({ post, onRefresh }) {
     onRefresh();
   };
 
+  const handleResume = async () => {
+    await resumePost(post.id);
+    onRefresh();
+  };
+
   const handleDelete = async () => {
     if (window.confirm('Delete this post?')) {
       await deletePost(post.id);
@@ -60,7 +71,41 @@ export default function PostCard({ post, onRefresh }) {
     onRefresh();
   };
 
+  const startEditing = () => {
+    setEditCaption(post.caption || '');
+    setEditHashtags(post.hashtags || '');
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setEditCaption(post.caption || '');
+    setEditHashtags(post.hashtags || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editCaption.trim()) {
+      alert('Caption is required');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      await updatePost(post.id, {
+        caption: editCaption.trim(),
+        hashtags: editHashtags.trim(),
+      });
+      setEditing(false);
+      onRefresh();
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const PlatformIcon = platformIcons[post.platform] || Globe2;
+  const showPostActions = post.status !== 'published';
+  const canEditPost = post.status !== 'published';
+  const isLongCaption = (post.caption || '').length > 220;
 
   return (
     <article className="flex min-h-72 flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-teal-500/40 dark:hover:shadow-black/20">
@@ -71,9 +116,20 @@ export default function PostCard({ post, onRefresh }) {
           </div>
           <span className="truncate text-sm font-semibold capitalize text-slate-950 dark:text-white">{post.platform}</span>
         </div>
-        <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium capitalize ring-1 ${statusColors[post.status] || statusColors.draft}`}>
-          {post.status.replace('_', ' ')}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {canEditPost && !editing && (
+            <button
+              onClick={startEditing}
+              className="grid size-8 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
+              title="Edit caption and hashtags"
+            >
+              <Edit3 size={14} aria-hidden="true" />
+            </button>
+          )}
+          <span className={`rounded-md px-2 py-1 text-xs font-medium capitalize ring-1 ${statusColors[post.status] || statusColors.draft}`}>
+            {post.status.replace('_', ' ')}
+          </span>
+        </div>
       </div>
 
       {post.image_url && (
@@ -85,14 +141,79 @@ export default function PostCard({ post, onRefresh }) {
         />
       )}
 
-      <p className="line-clamp-5 text-sm leading-6 text-slate-700 dark:text-slate-300">{post.caption}</p>
+      {editing ? (
+        <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Caption</label>
+            <textarea
+              value={editCaption}
+              onChange={e => setEditCaption(e.target.value)}
+              rows={5}
+              className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-950 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Hashtags</label>
+            <textarea
+              value={editHashtags}
+              onChange={e => setEditHashtags(e.target.value)}
+              rows={2}
+              className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-950 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveEdit}
+              disabled={savingEdit}
+              className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+            >
+              <Save size={14} aria-hidden="true" />
+              {savingEdit ? 'Saving' : 'Save'}
+            </button>
+            <button
+              onClick={cancelEditing}
+              disabled={savingEdit}
+              className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <X size={14} aria-hidden="true" />
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className={`${captionExpanded ? '' : 'line-clamp-5'} whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-slate-300`}>
+            {post.caption}
+          </p>
+          {isLongCaption && (
+            <button
+              type="button"
+              onClick={() => setCaptionExpanded(expanded => !expanded)}
+              className="mt-2 text-xs font-semibold text-teal-700 transition hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-200"
+            >
+              {captionExpanded ? 'Show less' : 'Show more'}
+            </button>
+          )}
+        </div>
+      )}
 
-      {post.hashtags && (
+      {!editing && post.hashtags && (
         <p className="text-sm font-medium leading-6 text-teal-700">{post.hashtags}</p>
       )}
 
       {post.image_prompt && (
-        <p className="rounded-md bg-slate-50 p-3 text-xs italic leading-5 text-slate-500 dark:bg-slate-950 dark:text-slate-400">{post.image_prompt}</p>
+        <div>
+          <button
+            type="button"
+            onClick={() => setImagePromptVisible(visible => !visible)}
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {imagePromptVisible ? 'Hide image prompt' : 'Show image prompt'}
+          </button>
+          {imagePromptVisible && (
+            <p className="mt-2 rounded-md bg-slate-50 p-3 text-xs italic leading-5 text-slate-500 dark:bg-slate-950 dark:text-slate-400">{post.image_prompt}</p>
+          )}
+        </div>
       )}
 
       {post.scheduled_at && (
@@ -143,6 +264,7 @@ export default function PostCard({ post, onRefresh }) {
         </div>
       )}
 
+      {showPostActions && (
       <div className="mt-auto flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
         {['draft', 'pending_approval'].includes(post.status) && (
           <button
@@ -153,7 +275,15 @@ export default function PostCard({ post, onRefresh }) {
             Approve
           </button>
         )}
-        {post.status !== 'paused' && (
+        {post.status === 'paused' ? (
+          <button
+            onClick={handleResume}
+            className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+          >
+            <Play size={14} aria-hidden="true" />
+            Resume
+          </button>
+        ) : (
           <button
             onClick={handlePause}
             className="inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-3 text-xs font-medium text-orange-700 transition hover:bg-orange-100"
@@ -170,6 +300,7 @@ export default function PostCard({ post, onRefresh }) {
           Delete
         </button>
       </div>
+      )}
     </article>
   );
 }

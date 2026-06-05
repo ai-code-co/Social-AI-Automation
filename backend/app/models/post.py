@@ -31,6 +31,7 @@ class Post(Base):
     image_prompt = Column(Text)       # prompt used to generate visual
     image_url = Column(String(500))   # final image URL or path
     status = Column(Enum(PostStatus), default=PostStatus.draft)
+    status_before_pause = Column(String(50), nullable=True)
     scheduled_at = Column(DateTime, nullable=True)
     published_at = Column(DateTime, nullable=True)
     publish_attempts = Column(Integer, default=0)

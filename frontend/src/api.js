@@ -27,6 +27,9 @@ export const approveAll = (brandId) =>
 export const pausePost = (id) =>
   API.post(`/posts/${id}/pause`);
 
+export const resumePost = (id) =>
+  API.post(`/posts/${id}/resume`);
+
 export const deletePost = (id) =>
   API.delete(`/posts/${id}`);
 

@@ -196,10 +196,32 @@ def pause_post(post_id: int, db: Session = Depends(get_db)):
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    if post.status == PostStatus.paused:
+        return {"message": f"Post {post_id} is already paused", "post": post}
+    post.status_before_pause = post.status.value
     post.status = PostStatus.paused
     db.commit()
     db.refresh(post)
     return {"message": f"Post {post_id} paused", "post": post}
+
+
+@router.post("/{post_id}/resume")
+def resume_post(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.status != PostStatus.paused:
+        raise HTTPException(status_code=400, detail=f"Cannot resume a post with status '{post.status}'")
+
+    previous_status = post.status_before_pause or PostStatus.approved.value
+    try:
+        post.status = PostStatus(previous_status)
+    except ValueError:
+        post.status = PostStatus.approved
+    post.status_before_pause = None
+    db.commit()
+    db.refresh(post)
+    return {"message": f"Post {post_id} resumed", "post": post}
 
 
 @router.put("/{post_id}")
@@ -219,6 +241,8 @@ def update_post(post_id: int, request: UpdatePostRequest, db: Session = Depends(
         post.scheduled_at = request.scheduled_at
     if request.status:
         post.status = request.status
+        if request.status != PostStatus.paused:
+            post.status_before_pause = None
         if request.status == PostStatus.scheduled:
             post.error_log = None
             post.published_at = None

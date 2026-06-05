@@ -34,6 +34,9 @@ def init_db():
         if "error_log" not in columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE posts ADD COLUMN error_log TEXT"))
+        if "status_before_pause" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE posts ADD COLUMN status_before_pause VARCHAR(50)"))
 
     if inspector.has_table("brand_settings"):
         columns = {column["name"] for column in inspector.get_columns("brand_settings")}

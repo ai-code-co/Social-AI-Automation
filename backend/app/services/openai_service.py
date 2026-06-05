@@ -1,3 +1,5 @@
+import re
+
 from openai import OpenAI
 from app.config import settings
 
@@ -11,6 +13,31 @@ PLATFORM_RULES = {
     "tiktok": "Fun, trendy, under 100 words. Hook in first line.",
     "youtube": "Engaging video description, 150-200 words. Include call to action.",
 }
+
+
+HASHTAG_PATTERN = re.compile(r"(?<!\w)#[A-Za-z0-9_]+")
+
+
+def separate_caption_hashtags(caption: str, hashtags: str) -> tuple[str, str]:
+    caption_tags = HASHTAG_PATTERN.findall(caption or "")
+    clean_caption = HASHTAG_PATTERN.sub("", caption or "")
+    clean_caption = re.sub(r"[ \t]+", " ", clean_caption)
+    clean_caption = re.sub(r"\n{3,}", "\n\n", clean_caption).strip()
+
+    hashtag_parts = (hashtags or "").split()
+    seen = set()
+    merged_hashtags = []
+    for tag in [*hashtag_parts, *caption_tags]:
+        normalized = tag.strip()
+        if not normalized.startswith("#"):
+            continue
+        key = normalized.lower()
+        if key not in seen:
+            seen.add(key)
+            merged_hashtags.append(normalized)
+
+    return clean_caption, " ".join(merged_hashtags)
+
 
 def generate_post(
     platform: str,
@@ -34,9 +61,14 @@ Platform rules: {platform_rule}
 Default hashtags to include: {hashtags}
 
 Generate a social media post with:
-1. A compelling caption
+1. A compelling caption with no hashtags in it
 2. Relevant hashtags (include the default ones)
 3. A short image prompt describing the ideal visual for this post
+
+Important:
+- Do not put any hashtag in the CAPTION field.
+- Put all hashtags only in the HASHTAGS field.
+- Do not repeat hashtags in both fields.
 
 Respond in this exact format:
 CAPTION: <caption here>
@@ -60,5 +92,10 @@ IMAGE_PROMPT: <image prompt here>
             result["hashtags"] = line.replace("HASHTAGS:", "").strip()
         elif line.startswith("IMAGE_PROMPT:"):
             result["image_prompt"] = line.replace("IMAGE_PROMPT:", "").strip()
+
+    result["caption"], result["hashtags"] = separate_caption_hashtags(
+        result["caption"],
+        result["hashtags"],
+    )
 
     return result
