@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from app.auth import get_current_user
 from app.models import get_db, Platform, Post, PostStatus
 from app.models.brand import BrandSettings
+from app.models.user import User
 from app.services.image_service import ImageGenerationError, fetch_generated_image, get_post_image_url
 from app.services.openai_service import generate_post
 from app.tasks.post_tasks import auto_generate_posts
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/posts", tags=["posts"])
 class GeneratePostRequest(BaseModel):
     platform: str
     topic: Optional[str] = None
-    brand_id: Optional[int] = None
+    brand_id: int
     brand_voice: Optional[str] = None
     hashtags: Optional[str] = None
 
@@ -28,20 +30,32 @@ class UpdatePostRequest(BaseModel):
     brand_id: Optional[int] = None
 
 
-def get_brand_or_404(db: Session, brand_id: Optional[int]) -> Optional[BrandSettings]:
-    if brand_id is None:
-        return None
-
-    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id).first()
+def get_brand_or_404(db: Session, brand_id: int, current_user: User) -> BrandSettings:
+    brand = (
+        db.query(BrandSettings)
+        .filter(BrandSettings.id == brand_id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .first()
+    )
     if not brand:
         raise HTTPException(status_code=404, detail="Business not found")
     return brand
 
 
-def get_default_topic(brand: Optional[BrandSettings]) -> str:
-    if not brand:
-        return "new offer or useful update for the audience"
+def get_user_post_or_404(db: Session, post_id: int, current_user: User) -> Post:
+    post = (
+        db.query(Post)
+        .join(BrandSettings, Post.brand_id == BrandSettings.id)
+        .filter(Post.id == post_id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .first()
+    )
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
 
+
+def get_default_topic(brand: BrandSettings) -> str:
     topics = [
         topic.strip()
         for topic in (brand.topics or "").split(",")
@@ -56,10 +70,7 @@ def get_default_topic(brand: Optional[BrandSettings]) -> str:
     return topics[datetime.now().timetuple().tm_yday % len(topics)]
 
 
-def get_enabled_platforms(brand: Optional[BrandSettings]) -> set[str]:
-    if not brand:
-        return {platform.value for platform in Platform}
-
+def get_enabled_platforms(brand: BrandSettings) -> set[str]:
     platforms = {
         platform.strip().lower()
         for platform in (brand.enabled_platforms or "").split(",")
@@ -69,10 +80,14 @@ def get_enabled_platforms(brand: Optional[BrandSettings]) -> set[str]:
 
 
 @router.post("/generate")
-def generate_and_save_post(request: GeneratePostRequest, db: Session = Depends(get_db)):
-    brand = get_brand_or_404(db, request.brand_id)
-    brand_voice = request.brand_voice or (brand.brand_voice if brand else "clear, trustworthy, and engaging")
-    hashtags = request.hashtags or (brand.hashtags if brand else "#Business #SocialMedia #Marketing")
+def generate_and_save_post(
+    request: GeneratePostRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brand = get_brand_or_404(db, request.brand_id, current_user)
+    brand_voice = request.brand_voice or brand.brand_voice or "clear, trustworthy, and engaging"
+    hashtags = request.hashtags or brand.hashtags or "#Business #SocialMedia #Marketing"
     topic = request.topic.strip() if request.topic else get_default_topic(brand)
     platform = request.platform.strip().lower()
     enabled_platforms = get_enabled_platforms(brand)
@@ -80,7 +95,7 @@ def generate_and_save_post(request: GeneratePostRequest, db: Session = Depends(g
     if platform not in enabled_platforms:
         raise HTTPException(
             status_code=400,
-            detail=f"{brand.company_name if brand else 'This business'} is not configured for {platform}.",
+            detail=f"{brand.company_name} is not configured for {platform}.",
         )
 
     content = generate_post(
@@ -88,9 +103,9 @@ def generate_and_save_post(request: GeneratePostRequest, db: Session = Depends(g
         topic=topic,
         brand_voice=brand_voice,
         hashtags=hashtags,
-        business_name=brand.company_name if brand else "the business",
-        industry=brand.industry if brand else "general",
-        target_audience=brand.target_audience if brand else "customers and followers",
+        business_name=brand.company_name,
+        industry=brand.industry,
+        target_audience=brand.target_audience,
     )
 
     post = Post(
@@ -112,8 +127,15 @@ def generate_and_save_post(request: GeneratePostRequest, db: Session = Depends(g
 
 
 @router.post("/generate-batch")
-def trigger_batch_generation(brand_id: Optional[int] = None):
-    count = auto_generate_posts(brand_id=brand_id)
+def trigger_batch_generation(
+    brand_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if brand_id is not None:
+        get_brand_or_404(db, brand_id, current_user)
+
+    count = auto_generate_posts(brand_id=brand_id, user_id=current_user.id)
     scope = "selected business" if brand_id else "all businesses"
     return {"message": f"Generated {count} posts for {scope}"}
 
@@ -124,9 +146,15 @@ def get_all_posts(
     platform: Optional[str] = None,
     brand_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Post)
+    query = (
+        db.query(Post)
+        .join(BrandSettings, Post.brand_id == BrandSettings.id)
+        .filter(BrandSettings.user_id == current_user.id)
+    )
     if brand_id is not None:
+        get_brand_or_404(db, brand_id, current_user)
         query = query.filter(Post.brand_id == brand_id)
     if status:
         query = query.filter(Post.status == status)
@@ -136,9 +164,19 @@ def get_all_posts(
 
 
 @router.post("/approve-all")
-def approve_all_pending(brand_id: Optional[int] = None, db: Session = Depends(get_db)):
-    query = db.query(Post).filter(Post.status == PostStatus.pending_approval)
+def approve_all_pending(
+    brand_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = (
+        db.query(Post)
+        .join(BrandSettings, Post.brand_id == BrandSettings.id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .filter(Post.status == PostStatus.pending_approval)
+    )
     if brand_id is not None:
+        get_brand_or_404(db, brand_id, current_user)
         query = query.filter(Post.brand_id == brand_id)
 
     posts = query.all()
@@ -153,18 +191,21 @@ def approve_all_pending(brand_id: Optional[int] = None, db: Session = Depends(ge
 
 
 @router.get("/{post_id}")
-def get_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    return post
+def get_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_user_post_or_404(db, post_id, current_user)
 
 
 @router.get("/{post_id}/image")
-def get_post_image(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+def get_post_image(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = get_user_post_or_404(db, post_id, current_user)
 
     try:
         image_content, media_type = fetch_generated_image(post.image_prompt or "", seed=post.id)
@@ -179,10 +220,12 @@ def get_post_image(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{post_id}/approve")
-def approve_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+def approve_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = get_user_post_or_404(db, post_id, current_user)
     if post.status not in [PostStatus.draft, PostStatus.pending_approval]:
         raise HTTPException(status_code=400, detail=f"Cannot approve a post with status '{post.status}'")
     post.status = PostStatus.approved
@@ -192,10 +235,12 @@ def approve_post(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{post_id}/pause")
-def pause_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+def pause_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = get_user_post_or_404(db, post_id, current_user)
     if post.status == PostStatus.paused:
         return {"message": f"Post {post_id} is already paused", "post": post}
     post.status_before_pause = post.status.value
@@ -206,10 +251,12 @@ def pause_post(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{post_id}/resume")
-def resume_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+def resume_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = get_user_post_or_404(db, post_id, current_user)
     if post.status != PostStatus.paused:
         raise HTTPException(status_code=400, detail=f"Cannot resume a post with status '{post.status}'")
 
@@ -225,13 +272,16 @@ def resume_post(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{post_id}")
-def update_post(post_id: int, request: UpdatePostRequest, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+def update_post(
+    post_id: int,
+    request: UpdatePostRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = get_user_post_or_404(db, post_id, current_user)
 
     if request.brand_id is not None:
-        get_brand_or_404(db, request.brand_id)
+        get_brand_or_404(db, request.brand_id, current_user)
         post.brand_id = request.brand_id
     if request.caption:
         post.caption = request.caption
@@ -255,10 +305,12 @@ def update_post(post_id: int, request: UpdatePostRequest, db: Session = Depends(
 
 
 @router.delete("/{post_id}")
-def delete_post(post_id: int, db: Session = Depends(get_db)):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+def delete_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    post = get_user_post_or_404(db, post_id, current_user)
     db.delete(post)
     db.commit()
     return {"message": f"Post {post_id} deleted"}

@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { AtSign, Briefcase, CalendarClock, Check, Clock, Edit3, ExternalLink, FileText, Globe2, Pause, Play, Save, Share2, Trash2, Video, X } from 'lucide-react';
-import { API_BASE_URL, approvePost, pausePost, resumePost, deletePost, updatePost } from '../api';
-
-const getMediaUrl = (url) => {
-  if (!url) return '';
-  return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-};
+import { approvePost, pausePost, resumePost, deletePost, getMediaUrl, updatePost } from '../api';
 
 export default function PostCard({ post, onRefresh }) {
   const [scheduledAt, setScheduledAt] = useState('');

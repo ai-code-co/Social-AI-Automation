@@ -37,10 +37,12 @@ def get_enabled_platforms(brand: BrandSettings) -> set[str]:
     return platforms or {"instagram", "facebook"}
 
 
-def auto_generate_posts(brand_id: int | None = None):
+def auto_generate_posts(brand_id: int | None = None, user_id: int | None = None):
     db: Session = SessionLocal()
     try:
         brands_query = db.query(BrandSettings)
+        if user_id is not None:
+            brands_query = brands_query.filter(BrandSettings.user_id == user_id)
         if brand_id is not None:
             brands_query = brands_query.filter(BrandSettings.id == brand_id)
         brands = brands_query.all()

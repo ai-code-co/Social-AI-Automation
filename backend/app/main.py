@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.db_init import init_db
+from app.routes.auth import router as auth_router
 from app.routes.posts import router as posts_router
 from app.routes.brand import router as brand_router
 from app.routes.social_accounts import router as social_accounts_router
@@ -34,6 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(posts_router)
 app.include_router(brand_router)
 app.include_router(social_accounts_router)

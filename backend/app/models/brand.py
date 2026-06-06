@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime
 from sqlalchemy.sql import func
 from app.models.base import Base
 
@@ -6,6 +6,7 @@ class BrandSettings(Base):
     __tablename__ = "brand_settings"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     company_name = Column(String(255), nullable=False)
     industry = Column(String(100), default="general")
     tone = Column(String(100), default="professional")

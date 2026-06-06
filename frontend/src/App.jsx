@@ -1,13 +1,26 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Building2, Check, ChevronDown, Link2, Moon, Palette, PenLine, Rows3, Sun } from 'lucide-react';
-import { getBrands } from './api';
+import { Building2, Check, ChevronDown, Link2, LogOut, Moon, Palette, PenLine, Rows3, Sun, UserRound } from 'lucide-react';
+import { clearAuthSession, getBrands, getCurrentUser, getStoredToken, getStoredUser } from './api';
+import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
 import BrandSettings from './components/BrandSettings';
 import GeneratePost from './components/GeneratePost';
 import SocialAccounts from './components/SocialAccounts';
 
+const syncDocumentTheme = (nextTheme) => {
+  document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+  document.documentElement.classList.toggle('light', nextTheme === 'light');
+  document.documentElement.dataset.theme = nextTheme;
+  document.documentElement.style.colorScheme = nextTheme;
+  localStorage.setItem('theme', nextTheme);
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [auth, setAuth] = useState(() => ({
+    token: getStoredToken(),
+    user: getStoredUser(),
+  }));
   const [brands, setBrands] = useState([]);
   const [selectedBrandId, setSelectedBrandId] = useState('');
   const [brandMenuOpen, setBrandMenuOpen] = useState(false);
@@ -27,6 +40,12 @@ export default function App() {
   const selectedBrand = brands.find(brand => String(brand.id) === String(selectedBrandId)) || null;
 
   const loadBrands = async (preferredId) => {
+    if (!auth.token) {
+      setBrands([]);
+      setSelectedBrandId('');
+      return;
+    }
+
     try {
       const res = await getBrands();
       setBrands(res.data);
@@ -44,32 +63,100 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadBrands();
-  }, []);
+    if (!auth.token) return undefined;
+
+    let active = true;
+
+    const fetchInitialBrands = async () => {
+      try {
+        const res = await getBrands();
+        if (!active) return;
+
+        setBrands(res.data);
+        if (res.data.length === 0) {
+          setSelectedBrandId('');
+          return;
+        }
+
+        setSelectedBrandId(currentId => {
+          const hasCurrent = res.data.some(brand => String(brand.id) === String(currentId));
+          return hasCurrent ? String(currentId) : String(res.data[0].id);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchInitialBrands();
+
+    return () => {
+      active = false;
+    };
+  }, [auth.token]);
 
   const applyTheme = (nextTheme) => {
     const normalizedTheme = nextTheme === 'dark' ? 'dark' : 'light';
-    document.documentElement.classList.toggle('dark', normalizedTheme === 'dark');
-    document.documentElement.classList.toggle('light', normalizedTheme === 'light');
-    document.documentElement.dataset.theme = normalizedTheme;
-    document.documentElement.style.colorScheme = normalizedTheme;
-    localStorage.setItem('theme', normalizedTheme);
     setTheme(normalizedTheme);
   };
 
   useLayoutEffect(() => {
-    applyTheme(theme);
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    document.documentElement.classList.toggle('light', theme === 'light');
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
+    syncDocumentTheme(theme);
   }, [theme]);
 
   const isDark = theme === 'dark';
+
+  useEffect(() => {
+    if (!auth.token) return undefined;
+
+    let active = true;
+    getCurrentUser()
+      .then(res => {
+        if (active) {
+          setAuth(current => ({ ...current, user: res.data }));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [auth.token]);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setAuth({ token: null, user: null });
+      setBrands([]);
+      setSelectedBrandId('');
+      setActiveTab('dashboard');
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
+  const handleAuthenticated = ({ access_token, user }) => {
+    setAuth({ token: access_token, user });
+    setActiveTab('dashboard');
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuth({ token: null, user: null });
+    setBrands([]);
+    setSelectedBrandId('');
+    setBrandMenuOpen(false);
+    setActiveTab('dashboard');
+  };
+
+  if (!auth.token) {
+    return (
+      <AuthPage
+        isDark={isDark}
+        onAuthenticated={handleAuthenticated}
+        onToggleTheme={() => applyTheme(isDark ? 'light' : 'dark')}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
@@ -145,6 +232,21 @@ export default function App() {
               >
                 {isDark ? <Moon size={17} aria-hidden="true" /> : <Sun size={17} aria-hidden="true" />}
                 <span className="hidden sm:inline">{isDark ? 'Dark' : 'Light'}</span>
+              </button>
+
+              <div className="inline-flex min-h-11 max-w-52 items-center gap-2 rounded-lg bg-white/10 px-3 text-sm font-medium text-white ring-1 ring-white/15 backdrop-blur">
+                <UserRound size={16} aria-hidden="true" />
+                <span className="truncate">{auth.user?.full_name || auth.user?.email || 'Account'}</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white/10 px-3 text-sm font-medium text-white ring-1 ring-white/15 backdrop-blur transition hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-teal-200/30"
+                title="Log out"
+              >
+                <LogOut size={17} aria-hidden="true" />
+                <span className="hidden sm:inline">Logout</span>
               </button>
 
               <nav className="flex w-full gap-2 overflow-x-auto rounded-lg bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur sm:w-auto">

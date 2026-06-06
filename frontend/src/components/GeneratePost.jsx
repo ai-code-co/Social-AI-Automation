@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Hash, Image, Loader2, Megaphone, PenLine, Send, Sparkles } from 'lucide-react';
-import { API_BASE_URL, generatePost } from '../api';
+import { generatePost, getMediaUrl } from '../api';
 
 const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube'];
 
@@ -10,11 +10,6 @@ const getEnabledPlatforms = (brand) => (
     .map(platform => platform.trim().toLowerCase())
     .filter(Boolean)
 );
-
-const getMediaUrl = (url) => {
-  if (!url) return '';
-  return url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-};
 
 export default function GeneratePost({ brand }) {
   const [form, setForm] = useState({
@@ -29,15 +24,17 @@ export default function GeneratePost({ brand }) {
 
   useEffect(() => {
     if (!brand) return;
-    const nextPlatforms = getEnabledPlatforms(brand);
-    setForm(current => ({
-      ...current,
-      platform: nextPlatforms.includes(current.platform) ? current.platform : nextPlatforms[0],
-      brand_voice: brand.brand_voice || 'clear, trustworthy, and engaging',
-      hashtags: brand.hashtags || '#Business #SocialMedia #Marketing',
-    }));
-    setResult(null);
-  }, [brand?.id]);
+    queueMicrotask(() => {
+      const nextPlatforms = getEnabledPlatforms(brand);
+      setForm(current => ({
+        ...current,
+        platform: nextPlatforms.includes(current.platform) ? current.platform : nextPlatforms[0],
+        brand_voice: brand.brand_voice || 'clear, trustworthy, and engaging',
+        hashtags: brand.hashtags || '#Business #SocialMedia #Marketing',
+      }));
+      setResult(null);
+    });
+  }, [brand]);
 
   const handleSubmit = async () => {
     if (!brand) return alert('Please add or select a business first');

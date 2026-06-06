@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, Loader2, Rocket, Sparkles, Wand2 } from 'lucide-react';
 import { getPosts, generateBatch, approveAll } from '../api';
 import PostCard from './PostCard';
@@ -9,7 +9,7 @@ export default function Dashboard({ brand }) {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     if (!brand) {
       setPosts([]);
       return;
@@ -24,11 +24,11 @@ export default function Dashboard({ brand }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [brand, filter]);
 
   useEffect(() => {
-    fetchPosts();
-  }, [filter, brand?.id]);
+    queueMicrotask(fetchPosts);
+  }, [fetchPosts]);
 
   const handleGenerateBatch = async () => {
     setGenerating(true);
@@ -36,7 +36,7 @@ export default function Dashboard({ brand }) {
       const res = await generateBatch(brand.id);
       alert(res.data.message);
       fetchPosts();
-    } catch (err) {
+    } catch {
       alert('Error generating posts');
     } finally {
       setGenerating(false);

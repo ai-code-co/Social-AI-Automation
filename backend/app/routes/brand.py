@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
+from app.auth import get_current_user
 from app.models import get_db
 from app.models.brand import BrandSettings
 from app.models.post import Platform, Post
+from app.models.user import User
 
 router = APIRouter(tags=["brands"])
 
@@ -42,14 +44,35 @@ class BrandSettingsRequest(BaseModel):
         return ",".join(dict.fromkeys(platforms))
 
 
+def get_user_brand_or_404(db: Session, brand_id: int, current_user: User) -> BrandSettings:
+    brand = (
+        db.query(BrandSettings)
+        .filter(BrandSettings.id == brand_id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .first()
+    )
+    if not brand:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return brand
+
+
 @router.get("/brands/")
-def list_brands(db: Session = Depends(get_db)):
-    return db.query(BrandSettings).order_by(BrandSettings.created_at.desc()).all()
+def list_brands(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return (
+        db.query(BrandSettings)
+        .filter(BrandSettings.user_id == current_user.id)
+        .order_by(BrandSettings.created_at.desc())
+        .all()
+    )
 
 
 @router.post("/brands/")
-def create_brand(request: BrandSettingsRequest, db: Session = Depends(get_db)):
-    brand = BrandSettings(**request.model_dump())
+def create_brand(
+    request: BrandSettingsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brand = BrandSettings(**request.model_dump(), user_id=current_user.id)
     db.add(brand)
     db.commit()
     db.refresh(brand)
@@ -57,18 +80,22 @@ def create_brand(request: BrandSettingsRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/brands/{brand_id}")
-def get_brand(brand_id: int, db: Session = Depends(get_db)):
-    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id).first()
-    if not brand:
-        raise HTTPException(status_code=404, detail="Business not found")
-    return brand
+def get_brand(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_user_brand_or_404(db, brand_id, current_user)
 
 
 @router.put("/brands/{brand_id}")
-def update_brand(brand_id: int, request: BrandSettingsRequest, db: Session = Depends(get_db)):
-    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id).first()
-    if not brand:
-        raise HTTPException(status_code=404, detail="Business not found")
+def update_brand(
+    brand_id: int,
+    request: BrandSettingsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brand = get_user_brand_or_404(db, brand_id, current_user)
 
     for key, value in request.model_dump().items():
         setattr(brand, key, value)
@@ -79,10 +106,12 @@ def update_brand(brand_id: int, request: BrandSettingsRequest, db: Session = Dep
 
 
 @router.delete("/brands/{brand_id}")
-def delete_brand(brand_id: int, db: Session = Depends(get_db)):
-    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id).first()
-    if not brand:
-        raise HTTPException(status_code=404, detail="Business not found")
+def delete_brand(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brand = get_user_brand_or_404(db, brand_id, current_user)
 
     post_count = db.query(Post).filter(Post.brand_id == brand_id).count()
     if post_count:
@@ -98,18 +127,32 @@ def delete_brand(brand_id: int, db: Session = Depends(get_db)):
 
 # Backward-compatible routes for the earlier single-brand frontend.
 @router.get("/brand/")
-def get_first_brand(db: Session = Depends(get_db)):
-    brand = db.query(BrandSettings).order_by(BrandSettings.created_at.desc()).first()
+def get_first_brand(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    brand = (
+        db.query(BrandSettings)
+        .filter(BrandSettings.user_id == current_user.id)
+        .order_by(BrandSettings.created_at.desc())
+        .first()
+    )
     if not brand:
         raise HTTPException(status_code=404, detail="Brand settings not found")
     return brand
 
 
 @router.post("/brand/")
-def save_first_brand(request: BrandSettingsRequest, db: Session = Depends(get_db)):
-    brand = db.query(BrandSettings).order_by(BrandSettings.created_at.desc()).first()
+def save_first_brand(
+    request: BrandSettingsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    brand = (
+        db.query(BrandSettings)
+        .filter(BrandSettings.user_id == current_user.id)
+        .order_by(BrandSettings.created_at.desc())
+        .first()
+    )
     if not brand:
-        brand = BrandSettings(**request.model_dump())
+        brand = BrandSettings(**request.model_dump(), user_id=current_user.id)
         db.add(brand)
     else:
         for key, value in request.model_dump().items():

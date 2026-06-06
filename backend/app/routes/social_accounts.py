@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.config import settings
 from app.models import get_db
 from app.models.brand import BrandSettings
 from app.models.social_account import SocialAccount
+from app.models.user import User
 
 
 router = APIRouter(prefix="/social-accounts", tags=["social-accounts"])
@@ -63,16 +65,38 @@ def serialize_account(account: SocialAccount) -> dict:
     }
 
 
-def get_brand_or_404(db: Session, brand_id: int) -> BrandSettings:
-    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id).first()
+def get_brand_or_404(db: Session, brand_id: int, current_user: User) -> BrandSettings:
+    brand = (
+        db.query(BrandSettings)
+        .filter(BrandSettings.id == brand_id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .first()
+    )
     if not brand:
         raise HTTPException(status_code=404, detail="Business not found")
     return brand
 
 
+def get_account_or_404(db: Session, account_id: int, current_user: User) -> SocialAccount:
+    account = (
+        db.query(SocialAccount)
+        .join(BrandSettings, SocialAccount.brand_id == BrandSettings.id)
+        .filter(SocialAccount.id == account_id)
+        .filter(BrandSettings.user_id == current_user.id)
+        .first()
+    )
+    if not account:
+        raise HTTPException(status_code=404, detail="Social account not found")
+    return account
+
+
 @router.get("/")
-def list_social_accounts(brand_id: int, db: Session = Depends(get_db)):
-    get_brand_or_404(db, brand_id)
+def list_social_accounts(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_brand_or_404(db, brand_id, current_user)
     accounts = (
         db.query(SocialAccount)
         .filter(SocialAccount.brand_id == brand_id)
@@ -83,8 +107,12 @@ def list_social_accounts(brand_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/")
-def create_social_account(request: SocialAccountRequest, db: Session = Depends(get_db)):
-    get_brand_or_404(db, request.brand_id)
+def create_social_account(
+    request: SocialAccountRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_brand_or_404(db, request.brand_id, current_user)
     existing = (
         db.query(SocialAccount)
         .filter(SocialAccount.brand_id == request.brand_id)
@@ -107,10 +135,13 @@ def create_social_account(request: SocialAccountRequest, db: Session = Depends(g
 
 
 @router.put("/{account_id}")
-def update_social_account(account_id: int, request: SocialAccountUpdateRequest, db: Session = Depends(get_db)):
-    account = db.query(SocialAccount).filter(SocialAccount.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Social account not found")
+def update_social_account(
+    account_id: int,
+    request: SocialAccountUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    account = get_account_or_404(db, account_id, current_user)
 
     for key, value in request.model_dump(exclude_unset=True).items():
         setattr(account, key, value)
@@ -121,10 +152,12 @@ def update_social_account(account_id: int, request: SocialAccountUpdateRequest, 
 
 
 @router.delete("/{account_id}")
-def delete_social_account(account_id: int, db: Session = Depends(get_db)):
-    account = db.query(SocialAccount).filter(SocialAccount.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Social account not found")
+def delete_social_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    account = get_account_or_404(db, account_id, current_user)
 
     db.delete(account)
     db.commit()
@@ -132,7 +165,12 @@ def delete_social_account(account_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/meta/oauth-url")
-def get_meta_oauth_url(brand_id: int):
+def get_meta_oauth_url(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_brand_or_404(db, brand_id, current_user)
     if not settings.meta_app_id or not settings.meta_redirect_uri:
         raise HTTPException(status_code=400, detail="META_APP_ID and META_REDIRECT_URI are required for OAuth.")
 

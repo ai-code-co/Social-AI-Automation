@@ -22,8 +22,8 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
 
   useEffect(() => {
     if (mode === 'new') return;
-    setForm(selectedBrand || emptyBusiness);
-  }, [selectedBrand?.id, mode]);
+    queueMicrotask(() => setForm(selectedBrand || emptyBusiness));
+  }, [selectedBrand, mode]);
 
   const startNewBusiness = () => {
     setMode('new');

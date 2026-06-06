@@ -1,6 +1,6 @@
 from sqlalchemy import inspect, text
 from app.models.base import Base, engine
-from app.models import Post, BrandSettings
+from app.models import Post, BrandSettings, User
 
 
 def init_db():
@@ -40,6 +40,10 @@ def init_db():
 
     if inspector.has_table("brand_settings"):
         columns = {column["name"] for column in inspector.get_columns("brand_settings")}
+        if "user_id" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE brand_settings ADD COLUMN user_id INTEGER"))
+                connection.execute(text("CREATE INDEX IF NOT EXISTS ix_brand_settings_user_id ON brand_settings (user_id)"))
         if "enabled_platforms" not in columns:
             with engine.begin() as connection:
                 connection.execute(
