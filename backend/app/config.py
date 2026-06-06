@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     meta_app_id: str | None = None
     meta_app_secret: str | None = None
     meta_redirect_uri: str | None = None
+    meta_instagram_oauth_enabled: bool = False
 
     @field_validator("debug", mode="before")
     @classmethod

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from app.auth import get_current_user
+from app.auth import decode_access_token, get_current_user
 from app.models import get_db, Platform, Post, PostStatus
 from app.models.brand import BrandSettings
 from app.models.user import User
@@ -206,6 +206,28 @@ def get_post_image(
     current_user: User = Depends(get_current_user),
 ):
     post = get_user_post_or_404(db, post_id, current_user)
+
+    try:
+        image_content, media_type = fetch_generated_image(post.image_prompt or "", seed=post.id)
+    except ImageGenerationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return Response(
+        content=image_content,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@router.get("/{post_id}/publish-image")
+def get_publish_image(post_id: int, token: str, db: Session = Depends(get_db)):
+    token_subject = decode_access_token(token)
+    if token_subject != f"post_image:{post_id}":
+        raise HTTPException(status_code=401, detail="Invalid or expired image token")
+
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
 
     try:
         image_content, media_type = fetch_generated_image(post.image_prompt or "", seed=post.id)

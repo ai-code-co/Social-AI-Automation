@@ -1,7 +1,9 @@
-from urllib.parse import urljoin
+from datetime import timedelta
+from urllib.parse import quote, urljoin
 
 import httpx
 
+from app.auth import create_access_token
 from app.config import settings
 from app.models.post import Post
 from app.models.social_account import SocialAccount
@@ -25,7 +27,13 @@ def _post_image_url(post: Post) -> str | None:
         return post.image_url
     if not settings.public_app_url:
         return None
-    return urljoin(settings.public_app_url.rstrip("/") + "/", post.image_url.lstrip("/"))
+
+    image_token = create_access_token(
+        f"post_image:{post.id}",
+        expires_delta=timedelta(hours=6),
+    )
+    publish_image_path = f"/posts/{post.id}/publish-image?token={quote(image_token, safe='')}"
+    return urljoin(settings.public_app_url.rstrip("/") + "/", publish_image_path.lstrip("/"))
 
 
 def _graph_url(path: str) -> str:

@@ -50,22 +50,22 @@ export default function GeneratePost({ brand }) {
   };
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+    <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[0.9fr_1.1fr]">
       <div className="space-y-4">
         <div>
           <p className="text-sm font-medium text-teal-700 dark:text-teal-300">AI Composer</p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950 dark:text-white">Generate a single post</h2>
+          <h2 className="mt-1 text-xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-2xl">Generate a single post</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
             Choose a channel, set the topic, and generate content using the selected business memory.
           </p>
         </div>
 
-        <div className="rounded-lg border border-teal-100 bg-teal-50 p-4 dark:border-teal-500/20 dark:bg-teal-500/10">
+        <div className="rounded-lg border border-teal-100 bg-teal-50 p-3 dark:border-teal-500/20 dark:bg-teal-500/10 sm:p-4">
           <div className="flex gap-3">
             <div className="grid size-10 shrink-0 place-items-center rounded-md bg-white text-teal-700 shadow-sm dark:bg-slate-800 dark:text-teal-300">
               <Sparkles size={18} aria-hidden="true" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-sm font-semibold text-slate-950 dark:text-white">
                 {brand ? brand.company_name : 'No business selected'}
               </h3>
@@ -79,7 +79,7 @@ export default function GeneratePost({ brand }) {
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -153,7 +153,7 @@ export default function GeneratePost({ brand }) {
         </div>
 
         {result && (
-          <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+          <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10 sm:p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
               <Sparkles size={16} aria-hidden="true" />
               Post generated and saved

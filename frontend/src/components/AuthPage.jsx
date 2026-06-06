@@ -54,30 +54,30 @@ export default function AuthPage({ isDark, onAuthenticated, onToggleTheme }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7fb] text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
-      <div className="fixed inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_20%_0%,rgba(20,184,166,0.18),transparent_34%),radial-gradient(circle_at_80%_10%,rgba(14,165,233,0.16),transparent_30%),linear-gradient(135deg,#0f172a,#1e293b_55%,#064e3b)] dark:bg-[radial-gradient(circle_at_20%_0%,rgba(45,212,191,0.14),transparent_34%),radial-gradient(circle_at_80%_10%,rgba(56,189,248,0.12),transparent_30%),linear-gradient(135deg,#020617,#0f172a_55%,#042f2e)]" />
-      <main className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6">
-        <div className="grid w-full gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+    <div className="min-h-screen overflow-x-hidden bg-[#f6f7fb] text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <div className="fixed inset-x-0 top-0 h-[19rem] bg-[radial-gradient(circle_at_20%_0%,rgba(20,184,166,0.18),transparent_34%),radial-gradient(circle_at_80%_10%,rgba(14,165,233,0.16),transparent_30%),linear-gradient(135deg,#0f172a,#1e293b_55%,#064e3b)] dark:bg-[radial-gradient(circle_at_20%_0%,rgba(45,212,191,0.14),transparent_34%),radial-gradient(circle_at_80%_10%,rgba(56,189,248,0.12),transparent_30%),linear-gradient(135deg,#020617,#0f172a_55%,#042f2e)] sm:h-80" />
+      <main className="relative mx-auto flex min-h-screen max-w-6xl items-start px-3 py-6 sm:px-5 sm:py-10 lg:items-center lg:px-6">
+        <div className="grid w-full gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <section>
-            <div className="flex items-center gap-3 text-white">
-              <div className="grid size-12 place-items-center rounded-lg bg-white/10 text-white ring-1 ring-white/20 backdrop-blur">
+            <div className="flex min-w-0 items-center gap-3 text-white">
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-white/10 text-white ring-1 ring-white/20 backdrop-blur sm:size-12">
                 <Building2 size={23} aria-hidden="true" />
               </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-normal">Social AI Automation</h1>
-                <p className="text-sm text-cyan-50/75">Private workspaces for every creator and business</p>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-semibold tracking-normal sm:text-2xl">Social AI Automation</h1>
+                <p className="truncate text-xs text-cyan-50/75 sm:text-sm">Private workspaces for every creator and business</p>
               </div>
             </div>
-            <div className="mt-8 max-w-xl">
-              <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-600 dark:text-teal-200">Workspace Access</p>
-              <h2 className="mt-3 text-4xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-5xl">
+            <div className="mt-6 max-w-xl sm:mt-8">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-600 dark:text-teal-200 sm:text-sm">Workspace Access</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-normal text-slate-950 dark:text-white sm:mt-3 sm:text-5xl">
                 Sign in to manage your brands, posts, and publishing queue.
               </h2>
             </div>
           </section>
 
-          <section className="rounded-lg border border-white/70 bg-white/95 p-5 shadow-2xl shadow-slate-900/10 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/30 sm:p-6">
-            <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <section className="rounded-lg border border-white/70 bg-white/95 p-4 shadow-2xl shadow-slate-900/10 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/30 sm:p-6">
+            <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
               <div>
                 <p className="text-sm font-medium text-teal-700 dark:text-teal-300">
                   {isRegistering ? 'Create Account' : 'Welcome Back'}
@@ -89,7 +89,7 @@ export default function AuthPage({ isDark, onAuthenticated, onToggleTheme }) {
               <button
                 type="button"
                 onClick={onToggleTheme}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 sm:w-auto"
                 title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
               >
                 {isDark ? <Moon size={16} aria-hidden="true" /> : <Sun size={16} aria-hidden="true" />}
