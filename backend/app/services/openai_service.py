@@ -10,8 +10,6 @@ PLATFORM_RULES = {
     "facebook": "Keep it under 200 words. Engaging and shareable.",
     "linkedin": "Professional tone, under 250 words. Insight-driven.",
     "twitter": "Under 280 characters. Punchy and direct.",
-    "tiktok": "Fun, trendy, under 100 words. Hook in first line.",
-    "youtube": "Engaging video description, 150-200 words. Include call to action.",
 }
 
 

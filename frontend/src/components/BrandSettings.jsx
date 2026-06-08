@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BadgeCheck, Building2, Plus, Save, Trash2 } from 'lucide-react';
 import { createBrand, deleteBrand, updateBrand } from '../api';
 
-const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube'];
+const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter'];
 
 const emptyBusiness = {
   company_name: '',

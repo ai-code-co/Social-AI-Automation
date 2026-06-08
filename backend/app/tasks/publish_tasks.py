@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.models.base import SessionLocal
 from app.models.post import Post, PostStatus
 from app.models.social_account import SocialAccount
-from app.services.meta_publisher import PublishError, publish_to_meta
+from app.services.linkedin_publisher import PublishError as LinkedInPublishError, publish_to_linkedin
+from app.services.meta_publisher import PublishError as MetaPublishError, publish_to_meta
+from app.services.x_publisher import PublishError as XPublishError, publish_to_x
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +44,14 @@ def publish_due_posts() -> int:
                 continue
 
             try:
-                result = publish_to_meta(post, account)
+                if post.platform.value in {"facebook", "instagram"}:
+                    result = publish_to_meta(post, account)
+                elif post.platform.value == "linkedin":
+                    result = publish_to_linkedin(post, account)
+                elif post.platform.value == "twitter":
+                    result = publish_to_x(post, account)
+                else:
+                    raise MetaPublishError(f"Publishing is not configured for {post.platform.value} yet.")
                 post.status = PostStatus.published
                 post.published_at = datetime.now()
                 post.external_post_id = result.get("external_post_id")
@@ -50,7 +59,7 @@ def publish_due_posts() -> int:
                 post.error_log = None
                 account.last_error = None
                 published_count += 1
-            except PublishError as exc:
+            except (MetaPublishError, LinkedInPublishError, XPublishError) as exc:
                 post.status = PostStatus.failed
                 post.error_log = str(exc)
                 account.last_error = str(exc)

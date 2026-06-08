@@ -25,6 +25,19 @@ class Settings(BaseSettings):
     meta_app_secret: str | None = None
     meta_redirect_uri: str | None = None
     meta_instagram_oauth_enabled: bool = False
+    instagram_app_id: str | None = None
+    instagram_app_secret: str | None = None
+    instagram_redirect_uri: str | None = None
+    linkedin_client_id: str | None = None
+    linkedin_client_secret: str | None = None
+    linkedin_redirect_uri: str | None = None
+    linkedin_version: str = "202602"
+    x_client_id: str | None = None
+    x_client_secret: str | None = None
+    x_redirect_uri: str | None = None
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_redirect_uri: str | None = None
 
     @field_validator("debug", mode="before")
     @classmethod

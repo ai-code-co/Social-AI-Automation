@@ -41,6 +41,11 @@ def _graph_url(path: str) -> str:
     return f"https://graph.facebook.com/{version}/{path.lstrip('/')}"
 
 
+def _instagram_graph_url(path: str) -> str:
+    version = settings.meta_graph_version.strip().lstrip("/")
+    return f"https://graph.instagram.com/{version}/{path.lstrip('/')}"
+
+
 def _raise_for_graph_error(response: httpx.Response) -> dict:
     try:
         data = response.json()
@@ -53,6 +58,14 @@ def _raise_for_graph_error(response: httpx.Response) -> dict:
         raise PublishError(message)
 
     return data
+
+
+def _facebook_post_url(external_id: str | None) -> str | None:
+    if not external_id:
+        return None
+    if "_" in external_id:
+        return f"https://www.facebook.com/{external_id}"
+    return f"https://www.facebook.com/photo.php?fbid={external_id}"
 
 
 def publish_to_meta(post: Post, account: SocialAccount) -> dict:
@@ -87,7 +100,7 @@ def _publish_facebook(post: Post, account: SocialAccount) -> dict:
     external_id = data.get("post_id") or data.get("id")
     return {
         "external_post_id": external_id,
-        "platform_post_url": f"https://www.facebook.com/{external_id}" if external_id else None,
+        "platform_post_url": _facebook_post_url(external_id),
     }
 
 
@@ -96,8 +109,10 @@ def _publish_instagram(post: Post, account: SocialAccount) -> dict:
     if not image_url:
         raise PublishError("Instagram publishing requires PUBLIC_APP_URL so the generated image is reachable by Meta.")
 
+    instagram_url = _instagram_graph_url if "instagram_business" in (account.scopes or "") else _graph_url
+
     container_response = httpx.post(
-        _graph_url(f"{account.account_id}/media"),
+        instagram_url(f"{account.account_id}/media"),
         data={
             "image_url": image_url,
             "caption": _caption(post),
@@ -111,7 +126,7 @@ def _publish_instagram(post: Post, account: SocialAccount) -> dict:
         raise PublishError("Meta did not return an Instagram media container ID.")
 
     publish_response = httpx.post(
-        _graph_url(f"{account.account_id}/media_publish"),
+        instagram_url(f"{account.account_id}/media_publish"),
         data={
             "creation_id": creation_id,
             "access_token": account.access_token,
@@ -120,7 +135,19 @@ def _publish_instagram(post: Post, account: SocialAccount) -> dict:
     )
     publish_data = _raise_for_graph_error(publish_response)
     external_id = publish_data.get("id")
+    permalink = None
+    if external_id:
+        permalink_response = httpx.get(
+            instagram_url(f"{external_id}"),
+            params={
+                "fields": "permalink",
+                "access_token": account.access_token,
+            },
+            timeout=30,
+        )
+        permalink_data = _raise_for_graph_error(permalink_response)
+        permalink = permalink_data.get("permalink")
     return {
         "external_post_id": external_id,
-        "platform_post_url": None,
+        "platform_post_url": permalink,
     }

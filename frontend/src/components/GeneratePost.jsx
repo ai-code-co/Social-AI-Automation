@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Hash, Image, Loader2, Megaphone, PenLine, Send, Sparkles } from 'lucide-react';
 import { generatePost, getMediaUrl } from '../api';
 
-const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube'];
+const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter'];
 
 const getEnabledPlatforms = (brand) => (
   (brand?.enabled_platforms || 'instagram,facebook')

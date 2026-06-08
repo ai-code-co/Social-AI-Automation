@@ -69,6 +69,9 @@ export const registerUser = (data) =>
 export const loginUser = (data) =>
   API.post('/auth/login', data);
 
+export const getGoogleOAuthUrl = () =>
+  API.get('/auth/google/oauth-url');
+
 export const getCurrentUser = () =>
   API.get('/auth/me');
 
@@ -131,3 +134,12 @@ export const deleteSocialAccount = (id) =>
 
 export const getMetaOAuthUrl = (brandId) =>
   API.get('/social-accounts/meta/oauth-url', { params: { brand_id: brandId } });
+
+export const getInstagramOAuthUrl = (brandId) =>
+  API.get('/social-accounts/instagram/oauth-url', { params: { brand_id: brandId } });
+
+export const getLinkedInOAuthUrl = (brandId) =>
+  API.get('/social-accounts/linkedin/oauth-url', { params: { brand_id: brandId } });
+
+export const getXOAuthUrl = (brandId) =>
+  API.get('/social-accounts/x/oauth-url', { params: { brand_id: brandId } });

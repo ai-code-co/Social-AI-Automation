@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AtSign, Briefcase, CalendarClock, Check, Clock, Edit3, ExternalLink, FileText, Globe2, Pause, Play, Save, Share2, Trash2, Video, X } from 'lucide-react';
+import { AtSign, Briefcase, CalendarClock, Check, Clock, Edit3, ExternalLink, Globe2, Pause, Play, Save, Share2, Trash2, X } from 'lucide-react';
 import { approvePost, pausePost, resumePost, deletePost, getMediaUrl, updatePost } from '../api';
 
 export default function PostCard({ post, onRefresh }) {
@@ -26,8 +26,6 @@ export default function PostCard({ post, onRefresh }) {
     facebook: Share2,
     linkedin: Briefcase,
     twitter: AtSign,
-    tiktok: FileText,
-    youtube: Video,
   };
 
   const handleApprove = async () => {

@@ -50,6 +50,16 @@ def init_db():
                     text("ALTER TABLE brand_settings ADD COLUMN enabled_platforms VARCHAR(255) DEFAULT 'instagram,facebook'")
                 )
 
+    if inspector.has_table("users"):
+        columns = {column["name"] for column in inspector.get_columns("users")}
+        if "google_id" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR(255)"))
+                connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)"))
+        if "auth_provider" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE users ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'password' NOT NULL"))
+
     print("Database tables are ready")
 
 

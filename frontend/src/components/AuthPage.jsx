@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2, Loader2, LockKeyhole, LogIn, Mail, Moon, Sun, User, UserPlus } from 'lucide-react';
-import { loginUser, registerUser, saveAuthSession } from '../api';
+import { getGoogleOAuthUrl, loginUser, registerUser, saveAuthSession } from '../api';
 
 export default function AuthPage({ isDark, onAuthenticated, onToggleTheme }) {
   const [mode, setMode] = useState('login');
@@ -10,9 +10,27 @@ export default function AuthPage({ isDark, onAuthenticated, onToggleTheme }) {
     full_name: '',
   });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
   const isRegistering = mode === 'register';
+
+  useEffect(() => {
+    const handleGoogleMessage = (event) => {
+      if (event.data?.type === 'google-authenticated') {
+        setGoogleLoading(false);
+        saveAuthSession(event.data.payload);
+        onAuthenticated(event.data.payload);
+      }
+      if (event.data?.type === 'google-auth-error') {
+        setGoogleLoading(false);
+        setError('Google sign-in was not completed');
+      }
+    };
+
+    window.addEventListener('message', handleGoogleMessage);
+    return () => window.removeEventListener('message', handleGoogleMessage);
+  }, [onAuthenticated]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -51,6 +69,22 @@ export default function AuthPage({ isDark, onAuthenticated, onToggleTheme }) {
   const switchMode = (nextMode) => {
     setMode(nextMode);
     setError('');
+  };
+
+  const handleGoogleAuth = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const res = await getGoogleOAuthUrl();
+      const popup = window.open(res.data.url, 'google-auth', 'width=520,height=720');
+      if (!popup) {
+        setGoogleLoading(false);
+        setError('Popup blocked. Allow popups for this app and try again.');
+      }
+    } catch (err) {
+      setGoogleLoading(false);
+      setError(err.response?.data?.detail || 'Google sign-in is not configured yet');
+    }
   };
 
   return (
@@ -122,6 +156,27 @@ export default function AuthPage({ isDark, onAuthenticated, onToggleTheme }) {
                 <UserPlus size={16} aria-hidden="true" />
                 Register
               </button>
+            </div>
+
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                disabled={googleLoading || loading}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              >
+                {googleLoading ? (
+                  <Loader2 className="animate-spin" size={17} aria-hidden="true" />
+                ) : (
+                  <span className="grid size-5 place-items-center rounded-sm bg-white text-sm font-bold text-slate-950">G</span>
+                )}
+                {googleLoading ? 'Waiting for Google' : 'Continue with Google'}
+              </button>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">or</span>
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              </div>
             </div>
 
             <form className="mt-5 space-y-4" onSubmit={handleSubmit}>

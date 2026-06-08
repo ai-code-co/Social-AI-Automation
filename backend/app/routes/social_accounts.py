@@ -1,4 +1,7 @@
 import json
+import base64
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 from html import escape
 from typing import Optional
@@ -22,6 +25,10 @@ router = APIRouter(prefix="/social-accounts", tags=["social-accounts"])
 
 META_PLATFORMS = {"facebook", "instagram"}
 META_PLACEHOLDERS = {"", "your_meta_app_id", "your_meta_app_secret"}
+SUPPORTED_PLATFORMS = {"facebook", "instagram", "linkedin", "twitter"}
+INSTAGRAM_PLACEHOLDERS = {"", "your_instagram_app_id", "your_instagram_app_secret"}
+LINKEDIN_PLACEHOLDERS = {"", "your_linkedin_client_id", "your_linkedin_client_secret"}
+X_PLACEHOLDERS = {"", "your_x_client_id", "your_x_client_secret"}
 
 
 class SocialAccountRequest(BaseModel):
@@ -39,8 +46,8 @@ class SocialAccountRequest(BaseModel):
     @classmethod
     def validate_platform(cls, value):
         platform = value.strip().lower()
-        if platform not in META_PLATFORMS:
-            raise ValueError("Only facebook and instagram are supported for publishing right now")
+        if platform not in SUPPORTED_PLATFORMS:
+            raise ValueError("Only facebook, instagram, linkedin, and twitter are supported for publishing right now")
         return platform
 
 
@@ -56,6 +63,20 @@ class SocialAccountUpdateRequest(BaseModel):
 
 class MetaConnectPageRequest(BaseModel):
     page_token: str
+
+
+def normalize_linkedin_author(account_id: str) -> str:
+    account_id = account_id.strip()
+    if account_id.startswith("urn:li:person:") or account_id.startswith("urn:li:organization:"):
+        return account_id
+    return f"urn:li:person:{account_id}"
+
+
+def create_pkce_pair() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(64)[:128]
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return verifier, challenge
 
 
 def serialize_account(account: SocialAccount) -> dict:
@@ -125,6 +146,66 @@ def validate_meta_settings(require_secret: bool = False):
         )
 
 
+def validate_instagram_settings(require_secret: bool = False):
+    app_id = (settings.instagram_app_id or "").strip()
+    app_secret = (settings.instagram_app_secret or "").strip()
+    redirect_uri = (settings.instagram_redirect_uri or "").strip()
+
+    missing = []
+    if app_id in INSTAGRAM_PLACEHOLDERS:
+        missing.append("INSTAGRAM_APP_ID")
+    if require_secret and app_secret in INSTAGRAM_PLACEHOLDERS:
+        missing.append("INSTAGRAM_APP_SECRET")
+    if not redirect_uri or redirect_uri.startswith("http:///"):
+        missing.append("INSTAGRAM_REDIRECT_URI")
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Instagram OAuth is not configured correctly. Update: {', '.join(missing)}.",
+        )
+
+
+def validate_linkedin_settings(require_secret: bool = False):
+    client_id = (settings.linkedin_client_id or "").strip()
+    client_secret = (settings.linkedin_client_secret or "").strip()
+    redirect_uri = (settings.linkedin_redirect_uri or "").strip()
+
+    missing = []
+    if client_id in LINKEDIN_PLACEHOLDERS:
+        missing.append("LINKEDIN_CLIENT_ID")
+    if require_secret and client_secret in LINKEDIN_PLACEHOLDERS:
+        missing.append("LINKEDIN_CLIENT_SECRET")
+    if not redirect_uri or redirect_uri.startswith("http:///"):
+        missing.append("LINKEDIN_REDIRECT_URI")
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"LinkedIn OAuth is not configured correctly. Update: {', '.join(missing)}.",
+        )
+
+
+def validate_x_settings(require_secret: bool = False):
+    client_id = (settings.x_client_id or "").strip()
+    client_secret = (settings.x_client_secret or "").strip()
+    redirect_uri = (settings.x_redirect_uri or "").strip()
+
+    missing = []
+    if client_id in X_PLACEHOLDERS:
+        missing.append("X_CLIENT_ID")
+    if require_secret and client_secret in X_PLACEHOLDERS:
+        missing.append("X_CLIENT_SECRET")
+    if not redirect_uri or redirect_uri.startswith("http:///"):
+        missing.append("X_REDIRECT_URI")
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"X OAuth is not configured correctly. Update: {', '.join(missing)}.",
+        )
+
+
 def raise_for_meta_error(response: httpx.Response) -> dict:
     try:
         data = response.json()
@@ -137,6 +218,52 @@ def raise_for_meta_error(response: httpx.Response) -> dict:
     if response.is_error or "error" in data:
         error = data.get("error", {})
         raise HTTPException(status_code=400, detail=error.get("message") or "Meta request failed")
+
+    return data
+
+
+def raise_for_instagram_error(response: httpx.Response) -> dict:
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+
+    if response.is_error or "error" in data:
+        error = data.get("error", {})
+        if isinstance(error, dict):
+            message = error.get("message") or error.get("error_user_msg")
+        else:
+            message = data.get("error_description") or str(error)
+        raise HTTPException(status_code=400, detail=message or "Instagram request failed")
+
+    return data
+
+
+def raise_for_linkedin_error(response: httpx.Response) -> dict:
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+
+    if response.is_error:
+        message = data.get("message") or data.get("error_description") or data.get("error") or response.text
+        raise HTTPException(status_code=400, detail=message or "LinkedIn request failed")
+
+    return data
+
+
+def raise_for_x_error(response: httpx.Response) -> dict:
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+
+    if response.is_error:
+        errors = data.get("errors")
+        message = data.get("detail") or data.get("error_description") or data.get("error") or response.text
+        if errors and isinstance(errors, list):
+            message = errors[0].get("message") or message
+        raise HTTPException(status_code=400, detail=message or "X request failed")
 
     return data
 
@@ -179,9 +306,138 @@ def save_meta_account(
     return account
 
 
+def save_instagram_account(
+    db: Session,
+    brand_id: int,
+    handle: str,
+    account_id: str,
+    access_token: str,
+    scopes: str,
+    token_expires_at: datetime | None = None,
+) -> SocialAccount:
+    existing = (
+        db.query(SocialAccount)
+        .filter(SocialAccount.brand_id == brand_id)
+        .filter(SocialAccount.platform == "instagram")
+        .first()
+    )
+    data = {
+        "brand_id": brand_id,
+        "platform": "instagram",
+        "handle": handle,
+        "account_id": account_id,
+        "access_token": access_token,
+        "scopes": scopes,
+        "token_expires_at": token_expires_at,
+        "is_active": True,
+        "last_error": None,
+    }
+
+    if existing:
+        for key, value in data.items():
+            setattr(existing, key, value)
+        return existing
+
+    account = SocialAccount(**data)
+    db.add(account)
+    return account
+
+
+def save_linkedin_account(
+    db: Session,
+    brand_id: int,
+    handle: str,
+    account_id: str,
+    access_token: str,
+    scopes: str,
+    token_expires_at: datetime | None = None,
+) -> SocialAccount:
+    existing = (
+        db.query(SocialAccount)
+        .filter(SocialAccount.brand_id == brand_id)
+        .filter(SocialAccount.platform == "linkedin")
+        .first()
+    )
+    data = {
+        "brand_id": brand_id,
+        "platform": "linkedin",
+        "handle": handle,
+        "account_id": normalize_linkedin_author(account_id),
+        "access_token": access_token,
+        "scopes": scopes,
+        "token_expires_at": token_expires_at,
+        "is_active": True,
+        "last_error": None,
+    }
+
+    if existing:
+        for key, value in data.items():
+            setattr(existing, key, value)
+        return existing
+
+    account = SocialAccount(**data)
+    db.add(account)
+    return account
+
+
+def save_x_account(
+    db: Session,
+    brand_id: int,
+    handle: str,
+    account_id: str,
+    access_token: str,
+    refresh_token: str | None,
+    scopes: str,
+    token_expires_at: datetime | None = None,
+) -> SocialAccount:
+    existing = (
+        db.query(SocialAccount)
+        .filter(SocialAccount.brand_id == brand_id)
+        .filter(SocialAccount.platform == "twitter")
+        .first()
+    )
+    data = {
+        "brand_id": brand_id,
+        "platform": "twitter",
+        "handle": handle,
+        "account_id": account_id,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "scopes": scopes,
+        "token_expires_at": token_expires_at,
+        "is_active": True,
+        "last_error": None,
+    }
+
+    if existing:
+        for key, value in data.items():
+            setattr(existing, key, value)
+        return existing
+
+    account = SocialAccount(**data)
+    db.add(account)
+    return account
+
+
 def render_meta_message(title: str, message: str, success: bool = False) -> HTMLResponse:
+    return render_oauth_message(title, message, success, "meta")
+
+
+def render_instagram_message(title: str, message: str, success: bool = False) -> HTMLResponse:
+    return render_oauth_message(title, message, success, "instagram")
+
+
+def render_linkedin_message(title: str, message: str, success: bool = False) -> HTMLResponse:
+    return render_oauth_message(title, message, success, "linkedin")
+
+
+def render_x_message(title: str, message: str, success: bool = False) -> HTMLResponse:
+    return render_oauth_message(title, message, success, "x")
+
+
+def render_oauth_message(title: str, message: str, success: bool, provider: str) -> HTMLResponse:
     color = "#0f766e" if success else "#be123c"
-    post_message_type = "meta-connected" if success else "meta-connect-error"
+    post_message_type = f"{provider}-connected" if success else f"{provider}-connect-error"
     return HTMLResponse(
         f"""
         <!doctype html>
@@ -243,18 +499,11 @@ def render_meta_message(title: str, message: str, success: bool = False) -> HTML
 def render_page_picker(pages: list[dict]) -> HTMLResponse:
     page_cards = []
     for page in pages:
-        instagram = page.get("instagram")
-        instagram_label = (
-            f"Instagram: @{escape(instagram.get('username') or instagram.get('name') or instagram.get('id'))}"
-            if instagram
-            else "No linked Instagram Business account found"
-        )
         page_cards.append(
             f"""
             <button class="page-card" type="button" data-token="{escape(page['page_token'])}">
               <span class="page-name">{escape(page['name'])}</span>
               <span class="page-meta">Facebook Page ID: {escape(page['id'])}</span>
-              <span class="page-meta">{instagram_label}</span>
             </button>
             """
         )
@@ -312,7 +561,7 @@ def render_page_picker(pages: list[dict]) -> HTMLResponse:
             <main>
               <div class="panel">
                 <h1>Choose a Facebook Page</h1>
-                <p>The selected Page will be connected for publishing. If it has a linked Instagram Business account, that will be connected too.</p>
+                <p>The selected Facebook Page will be connected for publishing. Instagram is connected separately with Instagram Business Login.</p>
                 {"".join(page_cards)}
                 <div class="status" id="status"></div>
               </div>
@@ -443,8 +692,6 @@ def get_meta_oauth_url(
         "pages_show_list",
         "business_management",
     ]
-    if settings.meta_instagram_oauth_enabled:
-        scopes.extend(["instagram_basic", "instagram_content_publish"])
     params = urlencode(
         {
             "client_id": settings.meta_app_id,
@@ -457,6 +704,371 @@ def get_meta_oauth_url(
     return {
         "url": f"https://www.facebook.com/{settings.meta_graph_version}/dialog/oauth?{params}"
     }
+
+
+@router.get("/instagram/oauth-url")
+def get_instagram_oauth_url(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_brand_or_404(db, brand_id, current_user)
+    validate_instagram_settings()
+
+    state = create_access_token(
+        json.dumps({"type": "instagram_oauth", "user_id": current_user.id, "brand_id": brand_id}),
+        expires_delta=timedelta(minutes=15),
+    )
+    params = urlencode(
+        {
+            "client_id": settings.instagram_app_id,
+            "redirect_uri": settings.instagram_redirect_uri,
+            "state": state,
+            "scope": "instagram_business_basic,instagram_business_content_publish",
+            "response_type": "code",
+        }
+    )
+    return {"url": f"https://www.instagram.com/oauth/authorize?{params}"}
+
+
+@router.get("/linkedin/oauth-url")
+def get_linkedin_oauth_url(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_brand_or_404(db, brand_id, current_user)
+    validate_linkedin_settings()
+
+    state = create_access_token(
+        json.dumps({"type": "linkedin_oauth", "user_id": current_user.id, "brand_id": brand_id}),
+        expires_delta=timedelta(minutes=15),
+    )
+    params = urlencode(
+        {
+            "response_type": "code",
+            "client_id": settings.linkedin_client_id,
+            "redirect_uri": settings.linkedin_redirect_uri,
+            "state": state,
+            "scope": "openid profile w_member_social",
+        }
+    )
+    return {"url": f"https://www.linkedin.com/oauth/v2/authorization?{params}"}
+
+
+@router.get("/x/oauth-url")
+def get_x_oauth_url(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_brand_or_404(db, brand_id, current_user)
+    validate_x_settings()
+
+    code_verifier, code_challenge = create_pkce_pair()
+    state = create_access_token(
+        json.dumps(
+            {
+                "type": "x_oauth",
+                "user_id": current_user.id,
+                "brand_id": brand_id,
+                "code_verifier": code_verifier,
+            }
+        ),
+        expires_delta=timedelta(minutes=15),
+    )
+    params = urlencode(
+        {
+            "response_type": "code",
+            "client_id": settings.x_client_id,
+            "redirect_uri": settings.x_redirect_uri,
+            "state": state,
+            "scope": "tweet.read tweet.write users.read offline.access",
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        }
+    )
+    return {"url": f"https://x.com/i/oauth2/authorize?{params}"}
+
+
+@router.get("/x/callback", response_class=HTMLResponse)
+def x_oauth_callback(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    if error:
+        return render_x_message("X connection cancelled", error_description or error)
+    if not code or not state:
+        return render_x_message("X connection failed", "X did not return the required authorization code.")
+
+    state_subject = decode_access_token(state)
+    if not state_subject:
+        return render_x_message("X connection expired", "Please start the connection again from the Social tab.")
+
+    try:
+        state_data = json.loads(state_subject)
+    except json.JSONDecodeError:
+        return render_x_message("X connection failed", "The X connection state is invalid.")
+
+    user_id = state_data.get("user_id")
+    brand_id = state_data.get("brand_id")
+    code_verifier = state_data.get("code_verifier")
+    if state_data.get("type") != "x_oauth" or not user_id or not brand_id or not code_verifier:
+        return render_x_message("X connection failed", "The X connection state is invalid.")
+
+    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id, BrandSettings.user_id == user_id).first()
+    if not brand:
+        return render_x_message("Business not found", "This X connection does not match an active business.")
+    try:
+        validate_x_settings(require_secret=True)
+    except HTTPException as exc:
+        return render_x_message("X is not configured", str(exc.detail))
+
+    auth_value = base64.b64encode(f"{settings.x_client_id}:{settings.x_client_secret}".encode("utf-8")).decode("ascii")
+    try:
+        token_response = httpx.post(
+            "https://api.x.com/2/oauth2/token",
+            data={
+                "code": code,
+                "grant_type": "authorization_code",
+                "client_id": settings.x_client_id,
+                "redirect_uri": settings.x_redirect_uri,
+                "code_verifier": code_verifier,
+            },
+            headers={
+                "Authorization": f"Basic {auth_value}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            timeout=30,
+        )
+        token_data = raise_for_x_error(token_response)
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return render_x_message("X connection failed", "X did not return an access token.")
+
+        user_response = httpx.get(
+            "https://api.x.com/2/users/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        user_data = raise_for_x_error(user_response).get("data") or {}
+    except HTTPException as exc:
+        return render_x_message("X connection failed", str(exc.detail))
+    except httpx.HTTPError as exc:
+        return render_x_message("X connection failed", f"Unable to reach X: {exc}")
+
+    x_user_id = user_data.get("id")
+    if not x_user_id:
+        return render_x_message("X connection failed", "X did not return a user identifier.")
+
+    token_expires_at = None
+    if token_data.get("expires_in"):
+        token_expires_at = datetime.utcnow() + timedelta(seconds=int(token_data["expires_in"]))
+
+    username = user_data.get("username") or x_user_id
+    handle = f"@{username}" if not str(username).startswith("@") else username
+    save_x_account(
+        db=db,
+        brand_id=brand_id,
+        handle=handle,
+        account_id=x_user_id,
+        access_token=access_token,
+        refresh_token=token_data.get("refresh_token"),
+        scopes=token_data.get("scope") or "tweet.read tweet.write users.read offline.access",
+        token_expires_at=token_expires_at,
+    )
+    db.commit()
+    return render_x_message("X connected", f"Connected {handle} for publishing.", success=True)
+
+
+@router.get("/instagram/callback", response_class=HTMLResponse)
+def instagram_oauth_callback(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    if error:
+        return render_instagram_message("Instagram connection cancelled", error_description or error)
+    if not code or not state:
+        return render_instagram_message("Instagram connection failed", "Instagram did not return the required authorization code.")
+
+    state_subject = decode_access_token(state)
+    if not state_subject:
+        return render_instagram_message("Instagram connection expired", "Please start the connection again from the Social tab.")
+
+    try:
+        state_data = json.loads(state_subject)
+    except json.JSONDecodeError:
+        return render_instagram_message("Instagram connection failed", "The Instagram connection state is invalid.")
+
+    user_id = state_data.get("user_id")
+    brand_id = state_data.get("brand_id")
+    if state_data.get("type") != "instagram_oauth" or not user_id or not brand_id:
+        return render_instagram_message("Instagram connection failed", "The Instagram connection state is invalid.")
+
+    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id, BrandSettings.user_id == user_id).first()
+    if not brand:
+        return render_instagram_message("Business not found", "This Instagram connection does not match an active business.")
+    try:
+        validate_instagram_settings(require_secret=True)
+    except HTTPException as exc:
+        return render_instagram_message("Instagram is not configured", str(exc.detail))
+
+    try:
+        token_response = httpx.post(
+            "https://api.instagram.com/oauth/access_token",
+            data={
+                "client_id": settings.instagram_app_id,
+                "client_secret": settings.instagram_app_secret,
+                "grant_type": "authorization_code",
+                "redirect_uri": settings.instagram_redirect_uri,
+                "code": code,
+            },
+            timeout=30,
+        )
+        token_data = raise_for_instagram_error(token_response)
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return render_instagram_message("Instagram connection failed", "Instagram did not return an access token.")
+
+        long_lived_response = httpx.get(
+            "https://graph.instagram.com/access_token",
+            params={
+                "grant_type": "ig_exchange_token",
+                "client_secret": settings.instagram_app_secret,
+                "access_token": access_token,
+            },
+            timeout=30,
+        )
+        long_lived_data = raise_for_instagram_error(long_lived_response)
+        access_token = long_lived_data.get("access_token") or access_token
+
+        profile_response = httpx.get(
+            "https://graph.instagram.com/me",
+            params={
+                "fields": "id,username,account_type",
+                "access_token": access_token,
+            },
+            timeout=30,
+        )
+        profile = raise_for_instagram_error(profile_response)
+    except HTTPException as exc:
+        return render_instagram_message("Instagram connection failed", str(exc.detail))
+    except httpx.HTTPError as exc:
+        return render_instagram_message("Instagram connection failed", f"Unable to reach Instagram: {exc}")
+
+    instagram_account_id = str(token_data.get("user_id") or profile.get("id") or "")
+    if not instagram_account_id:
+        return render_instagram_message("Instagram connection failed", "Instagram did not return an account ID.")
+
+    token_expires_at = None
+    if long_lived_data.get("expires_in"):
+        token_expires_at = datetime.utcnow() + timedelta(seconds=int(long_lived_data["expires_in"]))
+
+    username = profile.get("username") or instagram_account_id
+    handle = f"@{username}" if not str(username).startswith("@") else username
+    save_instagram_account(
+        db=db,
+        brand_id=brand_id,
+        handle=handle,
+        account_id=instagram_account_id,
+        access_token=access_token,
+        scopes="instagram_business_basic,instagram_business_content_publish",
+        token_expires_at=token_expires_at,
+    )
+    db.commit()
+    return render_instagram_message("Instagram connected", f"Connected {handle} for publishing.", success=True)
+
+
+@router.get("/linkedin/callback", response_class=HTMLResponse)
+def linkedin_oauth_callback(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    if error:
+        return render_linkedin_message("LinkedIn connection cancelled", error_description or error)
+    if not code or not state:
+        return render_linkedin_message("LinkedIn connection failed", "LinkedIn did not return the required authorization code.")
+
+    state_subject = decode_access_token(state)
+    if not state_subject:
+        return render_linkedin_message("LinkedIn connection expired", "Please start the connection again from the Social tab.")
+
+    try:
+        state_data = json.loads(state_subject)
+    except json.JSONDecodeError:
+        return render_linkedin_message("LinkedIn connection failed", "The LinkedIn connection state is invalid.")
+
+    user_id = state_data.get("user_id")
+    brand_id = state_data.get("brand_id")
+    if state_data.get("type") != "linkedin_oauth" or not user_id or not brand_id:
+        return render_linkedin_message("LinkedIn connection failed", "The LinkedIn connection state is invalid.")
+
+    brand = db.query(BrandSettings).filter(BrandSettings.id == brand_id, BrandSettings.user_id == user_id).first()
+    if not brand:
+        return render_linkedin_message("Business not found", "This LinkedIn connection does not match an active business.")
+    try:
+        validate_linkedin_settings(require_secret=True)
+    except HTTPException as exc:
+        return render_linkedin_message("LinkedIn is not configured", str(exc.detail))
+
+    try:
+        token_response = httpx.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": settings.linkedin_redirect_uri,
+                "client_id": settings.linkedin_client_id,
+                "client_secret": settings.linkedin_client_secret,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=30,
+        )
+        token_data = raise_for_linkedin_error(token_response)
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return render_linkedin_message("LinkedIn connection failed", "LinkedIn did not return an access token.")
+
+        userinfo_response = httpx.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        userinfo = raise_for_linkedin_error(userinfo_response)
+    except HTTPException as exc:
+        return render_linkedin_message("LinkedIn connection failed", str(exc.detail))
+    except httpx.HTTPError as exc:
+        return render_linkedin_message("LinkedIn connection failed", f"Unable to reach LinkedIn: {exc}")
+
+    linkedin_subject = userinfo.get("sub")
+    if not linkedin_subject:
+        return render_linkedin_message("LinkedIn connection failed", "LinkedIn did not return a member identifier.")
+
+    token_expires_at = None
+    if token_data.get("expires_in"):
+        token_expires_at = datetime.utcnow() + timedelta(seconds=int(token_data["expires_in"]))
+
+    handle = userinfo.get("name") or userinfo.get("preferred_username") or userinfo.get("email") or linkedin_subject
+    save_linkedin_account(
+        db=db,
+        brand_id=brand_id,
+        handle=handle,
+        account_id=linkedin_subject,
+        access_token=access_token,
+        scopes=token_data.get("scope") or "openid profile w_member_social",
+        token_expires_at=token_expires_at,
+    )
+    db.commit()
+    return render_linkedin_message("LinkedIn connected", f"Connected {handle} for publishing.", success=True)
 
 
 @router.get("/meta/callback", response_class=HTMLResponse)
@@ -525,8 +1137,6 @@ def meta_oauth_callback(
         expires_in = long_lived_data.get("expires_in")
 
         page_fields = "id,name,access_token,tasks"
-        if settings.meta_instagram_oauth_enabled:
-            page_fields = f"{page_fields},instagram_business_account{{id,username,name}}"
         pages_response = httpx.get(
             graph_url("me/accounts"),
             params={
@@ -535,20 +1145,7 @@ def meta_oauth_callback(
             },
             timeout=30,
         )
-        try:
-            pages_data = raise_for_meta_error(pages_response)
-        except HTTPException:
-            if not settings.meta_instagram_oauth_enabled:
-                raise
-            pages_response = httpx.get(
-                graph_url("me/accounts"),
-                params={
-                    "fields": "id,name,access_token,tasks",
-                    "access_token": user_access_token,
-                },
-                timeout=30,
-            )
-            pages_data = raise_for_meta_error(pages_response)
+        pages_data = raise_for_meta_error(pages_response)
     except HTTPException as exc:
         return render_meta_message("Meta connection failed", str(exc.detail))
     except httpx.HTTPError as exc:
@@ -564,7 +1161,6 @@ def meta_oauth_callback(
         if not page.get("id") or not page.get("name") or not page_access_token:
             continue
 
-        instagram = page.get("instagram_business_account")
         page_payload = {
             "type": "meta_page",
             "user_id": user_id,
@@ -574,13 +1170,11 @@ def meta_oauth_callback(
             "access_token": page_access_token,
             "scopes": "pages_manage_posts,pages_read_engagement,pages_show_list",
             "token_expires_at": token_expires_at,
-            "instagram": instagram,
         }
         page["page_token"] = create_access_token(
             json.dumps(page_payload),
             expires_delta=timedelta(minutes=15),
         )
-        page["instagram"] = instagram
         pages.append(page)
 
     if not pages:
@@ -627,21 +1221,5 @@ def connect_meta_page(request: MetaConnectPageRequest, db: Session = Depends(get
         token_expires_at=token_expires_at,
     )
 
-    instagram = page_data.get("instagram")
-    connected = ["Facebook Page"]
-    if instagram and instagram.get("id"):
-        instagram_handle = instagram.get("username") or instagram.get("name") or instagram["id"]
-        save_meta_account(
-            db=db,
-            brand_id=brand_id,
-            platform="instagram",
-            handle=f"@{instagram_handle}" if not str(instagram_handle).startswith("@") else instagram_handle,
-            account_id=instagram["id"],
-            access_token=page_data["access_token"],
-            scopes="instagram_basic,instagram_content_publish,pages_show_list",
-            token_expires_at=token_expires_at,
-        )
-        connected.append("Instagram Business account")
-
     db.commit()
-    return {"message": f"Connected {' and '.join(connected)}"}
+    return {"message": "Connected Facebook Page"}
