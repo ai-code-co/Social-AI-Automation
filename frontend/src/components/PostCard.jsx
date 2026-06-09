@@ -2,8 +2,23 @@ import { useState } from 'react';
 import { AtSign, Briefcase, CalendarClock, Check, Clock, Edit3, ExternalLink, Globe2, Pause, Play, Save, Share2, Trash2, X } from 'lucide-react';
 import { approvePost, pausePost, resumePost, deletePost, getMediaUrl, updatePost } from '../api';
 
+const parseScheduledAt = (value) => {
+  if (!value) return null;
+  return new Date(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`);
+};
+
+const toDateTimeLocalValue = (date) => {
+  if (!date || Number.isNaN(date.getTime())) return '';
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+};
+
 export default function PostCard({ post, onRefresh }) {
-  const [scheduledAt, setScheduledAt] = useState('');
+  const initialScheduledAt = toDateTimeLocalValue(parseScheduledAt(post.scheduled_at));
+  const [scheduledAt, setScheduledAt] = useState(initialScheduledAt);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const [editing, setEditing] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [imagePromptVisible, setImagePromptVisible] = useState(false);
@@ -50,18 +65,33 @@ export default function PostCard({ post, onRefresh }) {
     }
   };
 
+  const startRescheduling = () => {
+    setScheduledAt(initialScheduledAt);
+    setRescheduling(true);
+  };
+
+  const cancelRescheduling = () => {
+    setScheduledAt(initialScheduledAt);
+    setRescheduling(false);
+  };
+
   const handleSchedule = async () => {
     if (!scheduledAt) {
       alert('Choose a publish date and time');
       return;
     }
 
-    await updatePost(post.id, {
-      status: 'scheduled',
-      scheduled_at: scheduledAt,
-    });
-    setScheduledAt('');
-    onRefresh();
+    setSavingSchedule(true);
+    try {
+      await updatePost(post.id, {
+        status: 'scheduled',
+        scheduled_at: new Date(scheduledAt).toISOString(),
+      });
+      setRescheduling(false);
+      onRefresh();
+    } finally {
+      setSavingSchedule(false);
+    }
   };
 
   const startEditing = () => {
@@ -99,6 +129,10 @@ export default function PostCard({ post, onRefresh }) {
   const showPostActions = post.status !== 'published';
   const canEditPost = post.status !== 'published';
   const isLongCaption = (post.caption || '').length > 220;
+  const scheduledAtDate = parseScheduledAt(post.scheduled_at);
+  const canSchedulePost = ['draft', 'pending_approval', 'approved', 'failed'].includes(post.status);
+  const canReschedulePost = post.status === 'scheduled';
+  const showScheduleForm = canSchedulePost || (canReschedulePost && rescheduling);
 
   return (
     <article className="flex min-h-72 flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-teal-500/40 dark:hover:shadow-black/20 sm:p-5">
@@ -209,11 +243,23 @@ export default function PostCard({ post, onRefresh }) {
         </div>
       )}
 
-      {post.scheduled_at && (
-        <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <Clock size={13} aria-hidden="true" />
-          Scheduled: {new Date(post.scheduled_at).toLocaleString()}
-        </p>
+      {post.scheduled_at && scheduledAtDate && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <p className="flex min-w-0 items-center gap-2">
+            <Clock size={13} aria-hidden="true" />
+            <span>Scheduled: {scheduledAtDate.toLocaleString()}</span>
+          </p>
+          {canReschedulePost && !rescheduling && (
+            <button
+              type="button"
+              onClick={startRescheduling}
+              className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <CalendarClock size={13} aria-hidden="true" />
+              Edit schedule
+            </button>
+          )}
+        </div>
       )}
 
       {post.error_log && (
@@ -234,25 +280,37 @@ export default function PostCard({ post, onRefresh }) {
         </a>
       )}
 
-      {['draft', 'pending_approval', 'approved', 'failed'].includes(post.status) && (
+      {showScheduleForm && (
         <div className="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
           <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
             <CalendarClock size={13} aria-hidden="true" />
-            Publish date
+            {canReschedulePost ? 'Schedule time' : 'Publish date'}
           </label>
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <div className={`grid gap-2 ${canReschedulePost ? 'sm:grid-cols-[1fr_auto_auto]' : 'sm:grid-cols-[1fr_auto]'}`}>
             <input
               type="datetime-local"
               value={scheduledAt}
               onChange={e => setScheduledAt(e.target.value)}
+              disabled={savingSchedule}
               className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-950 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
             <button
               onClick={handleSchedule}
+              disabled={savingSchedule}
               className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-medium text-white transition hover:bg-slate-800 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
             >
-              Schedule
+              {savingSchedule ? 'Saving' : canReschedulePost ? 'Save' : 'Schedule'}
             </button>
+            {canReschedulePost && (
+              <button
+                type="button"
+                onClick={cancelRescheduling}
+                disabled={savingSchedule}
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       )}

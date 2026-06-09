@@ -1,16 +1,67 @@
-# React + Vite
+# Social AI Automation Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for the Social AI Automation app. It handles authentication, brand settings, post generation, approvals, scheduling views, and connected social accounts.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19
+- Vite
+- Tailwind CSS
+- Axios
+- React Router
+- Headless UI
+- Lucide React
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies:
 
-## Expanding the ESLint configuration
+```bash
+npm install
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
+
+Run linting:
+
+```bash
+npm run lint
+```
+
+## Backend API
+
+The frontend uses `VITE_API_BASE_URL` for API requests. For local development it falls back to:
+
+```text
+http://localhost:8000
+```
+
+Create `.env.local` for local overrides:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+## Deployment Notes
+
+- Deploy the contents of this `frontend` folder as the frontend repository.
+- Build command: `npm run build`
+- Output directory: `dist`
+- On Vercel, set `VITE_API_BASE_URL` to your Render backend URL.
+- Make sure the backend deployment allows CORS from the Vercel frontend domain.

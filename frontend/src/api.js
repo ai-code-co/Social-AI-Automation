@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-export const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 export const AUTH_TOKEN_KEY = 'social_ai_auth_token';
 export const AUTH_USER_KEY = 'social_ai_auth_user';
 
