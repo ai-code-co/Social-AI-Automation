@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Building2, Check, ChevronDown, Link2, LogOut, Moon, Palette, PenLine, Rows3, Sun, UserRound } from 'lucide-react';
-import { clearAuthSession, getBrands, getCurrentUser, getStoredToken, getStoredUser } from './api';
+import { Check, ChevronDown, Link2, LogOut, Moon, Palette, PenLine, Rows3, Sun, Trash2, UserRound } from 'lucide-react';
+import { clearAuthSession, deleteCurrentUser, getBrands, getCurrentUser, getStoredToken, getStoredUser } from './api';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
 import BrandSettings from './components/BrandSettings';
@@ -24,6 +24,9 @@ export default function App() {
   const [brands, setBrands] = useState([]);
   const [selectedBrandId, setSelectedBrandId] = useState('');
   const [brandMenuOpen, setBrandMenuOpen] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteDialogError, setDeleteDialogError] = useState('');
   const [theme, setTheme] = useState(() => {
     const storedTheme = localStorage.getItem('theme');
     if (storedTheme === 'dark' || storedTheme === 'light') return storedTheme;
@@ -148,6 +151,32 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  const openDeleteDialog = () => {
+    setDeleteDialogError('');
+    setDeleteDialogOpen(true);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeletingUser) return;
+    setDeleteDialogOpen(false);
+    setDeleteDialogError('');
+  };
+
+  const handleDeleteUser = async () => {
+    setIsDeletingUser(true);
+    setDeleteDialogError('');
+    try {
+      await deleteCurrentUser();
+      setDeleteDialogOpen(false);
+      handleLogout();
+    } catch (err) {
+      console.error(err);
+      setDeleteDialogError(err.response?.data?.detail || 'Unable to delete your user profile. Please try again.');
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
   if (!auth.token) {
     return (
       <AuthPage
@@ -165,17 +194,15 @@ export default function App() {
         <header className="px-3 py-4 sm:px-5 lg:px-6">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
             <div className="flex min-h-14 min-w-0 items-center gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-md bg-white/10 text-white ring-1 ring-white/20">
-                <Building2 size={19} aria-hidden="true" />
-              </div>
+              <img src="/app_logo.png" alt="" className="size-12 shrink-0 rounded-md object-contain" aria-hidden="true" />
               <div className="min-w-0">
-                <h1 className="truncate text-base font-semibold tracking-normal text-white sm:text-lg">Social AI Automation</h1>
-                <p className="truncate text-[0.7rem] text-cyan-50/75 sm:text-xs">Multi-business content command center</p>
+                <h1 className="truncate text-lg font-semibold tracking-normal text-white sm:text-xl">Social AI Automation</h1>
+                <p className="truncate text-xs text-cyan-50/75 sm:text-sm">Multi-business content command center</p>
               </div>
             </div>
 
-            <div className="grid w-full grid-cols-3 gap-1.5 sm:grid-cols-[minmax(15rem,1fr)_auto_auto] lg:w-[36rem] lg:grid-cols-[minmax(12rem,15rem)_auto_minmax(8rem,11rem)_auto]">
-              <div className="relative col-span-3 sm:col-span-1">
+            <div className="grid w-full grid-cols-4 gap-1.5 sm:grid-cols-[minmax(12rem,1fr)_auto_auto_auto_auto] lg:w-[42rem] lg:grid-cols-[minmax(13rem,1.8fr)_repeat(4,minmax(0,1fr))]">
+              <div className="relative col-span-4 sm:col-span-1">
                 <button
                   type="button"
                   onClick={() => setBrandMenuOpen(open => !open)}
@@ -223,7 +250,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => applyTheme(isDark ? 'light' : 'dark')}
-                className={`inline-flex min-h-8 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-xs font-medium ring-1 backdrop-blur transition focus:outline-none focus:ring-4 focus:ring-teal-200/30 sm:px-3 ${
+                className={`inline-flex min-h-8 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-xs font-medium ring-1 backdrop-blur transition focus:outline-none focus:ring-4 focus:ring-teal-200/30 sm:px-3 lg:w-full ${
                   isDark
                     ? 'bg-white text-slate-950 ring-white/30 hover:bg-slate-100'
                     : 'bg-white/10 text-white ring-white/15 hover:bg-white/15'
@@ -241,15 +268,25 @@ export default function App() {
 
               <button
                 type="button"
+                onClick={openDeleteDialog}
+                disabled={isDeletingUser}
+                aria-label="Delete user profile"
+                className="inline-flex min-h-8 w-full min-w-0 items-center justify-center rounded-md bg-rose-500/20 px-0 text-white ring-1 ring-rose-200/25 backdrop-blur transition hover:bg-rose-500/30 focus:outline-none focus:ring-4 focus:ring-rose-200/30 disabled:cursor-not-allowed disabled:opacity-60"
+                title="Delete user profile"
+              >
+                <Trash2 className="shrink-0" size={15} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
                 onClick={handleLogout}
-                className="inline-flex min-h-8 min-w-0 items-center justify-center gap-2 rounded-md bg-white/10 px-2 text-xs font-medium text-white ring-1 ring-white/15 backdrop-blur transition hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-teal-200/30 sm:px-3"
+                aria-label="Log out"
+                className="inline-flex min-h-8 w-full min-w-0 items-center justify-center rounded-md bg-white/10 px-0 text-white ring-1 ring-white/15 backdrop-blur transition hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-teal-200/30"
                 title="Log out"
               >
-                <LogOut size={15} aria-hidden="true" />
-                <span className="hidden sm:inline">Logout</span>
+                <LogOut className="shrink-0" size={15} aria-hidden="true" />
               </button>
 
-              <nav className="col-span-3 grid w-full grid-cols-4 gap-1 rounded-md bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur sm:col-span-3 lg:col-span-4">
+              <nav className="col-span-4 grid w-full grid-cols-4 gap-1 rounded-md bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur sm:col-span-5 lg:col-span-5">
                 {tabs.map(tab => {
                   const Icon = tab.icon;
                   return (
@@ -295,6 +332,57 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      {deleteDialogOpen && (
+        <div
+          className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/65 px-4 py-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-profile-title"
+        >
+          <div className="w-full max-w-md rounded-lg border border-rose-200/70 bg-white p-5 shadow-2xl shadow-slate-950/30 dark:border-rose-400/20 dark:bg-slate-950">
+            <div className="flex items-start gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-md bg-rose-50 text-rose-600 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20">
+                <Trash2 size={18} aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h3 id="delete-profile-title" className="text-base font-semibold text-slate-950 dark:text-white">
+                  Delete user profile?
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  This will permanently delete your account, businesses, posts, and connected social accounts.
+                </p>
+              </div>
+            </div>
+
+            {deleteDialogError && (
+              <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {deleteDialogError}
+              </div>
+            )}
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={closeDeleteDialog}
+                disabled={isDeletingUser}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                disabled={isDeletingUser}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus:ring-4 focus:ring-rose-200 disabled:cursor-not-allowed disabled:opacity-70 dark:focus:ring-rose-500/30"
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                <span>{isDeletingUser ? 'Deleting...' : 'Delete'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

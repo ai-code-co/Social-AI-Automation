@@ -133,6 +133,7 @@ export default function PostCard({ post, onRefresh }) {
   const canSchedulePost = ['draft', 'pending_approval', 'approved', 'failed'].includes(post.status);
   const canReschedulePost = post.status === 'scheduled';
   const showScheduleForm = canSchedulePost || (canReschedulePost && rescheduling);
+  const hasApproveAction = ['draft', 'pending_approval'].includes(post.status);
 
   return (
     <article className="flex min-h-64 flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-teal-500/40 dark:hover:shadow-black/20 sm:p-4">
@@ -286,7 +287,7 @@ export default function PostCard({ post, onRefresh }) {
             <CalendarClock size={13} aria-hidden="true" />
             {canReschedulePost ? 'Schedule time' : 'Publish date'}
           </label>
-          <div className={`grid gap-2 ${canReschedulePost ? 'sm:grid-cols-[1fr_auto_auto]' : 'sm:grid-cols-[1fr_auto]'}`}>
+          <div className={`grid gap-2 ${canReschedulePost ? 'grid-cols-[minmax(0,1fr)_auto_auto]' : 'grid-cols-[minmax(0,1fr)_auto]'}`}>
             <input
               type="datetime-local"
               value={scheduledAt}
@@ -316,11 +317,11 @@ export default function PostCard({ post, onRefresh }) {
       )}
 
       {showPostActions && (
-      <div className="mt-auto grid grid-cols-1 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex">
-        {['draft', 'pending_approval'].includes(post.status) && (
+      <div className={`mt-auto grid gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 ${hasApproveAction ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {hasApproveAction && (
           <button
             onClick={handleApprove}
-            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-medium text-white transition hover:bg-emerald-500"
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-2 text-xs font-medium text-white transition hover:bg-emerald-500 sm:px-3"
           >
             <Check size={14} aria-hidden="true" />
             Approve
@@ -329,7 +330,7 @@ export default function PostCard({ post, onRefresh }) {
         {post.status === 'paused' ? (
           <button
             onClick={handleResume}
-            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 sm:px-3"
           >
             <Play size={14} aria-hidden="true" />
             Resume
@@ -337,7 +338,7 @@ export default function PostCard({ post, onRefresh }) {
         ) : (
           <button
             onClick={handlePause}
-            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-3 text-xs font-medium text-orange-700 transition hover:bg-orange-100"
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md border border-orange-200 bg-orange-50 px-2 text-xs font-medium text-orange-700 transition hover:bg-orange-100 sm:px-3"
           >
             <Pause size={14} aria-hidden="true" />
             Pause
@@ -345,7 +346,7 @@ export default function PostCard({ post, onRefresh }) {
         )}
         <button
           onClick={handleDelete}
-          className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 text-xs font-medium text-rose-700 transition hover:bg-rose-100"
+          className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100 sm:px-3"
         >
           <Trash2 size={14} aria-hidden="true" />
           Delete

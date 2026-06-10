@@ -76,6 +76,8 @@ export const getGoogleOAuthUrl = () =>
 export const getCurrentUser = () =>
   API.get('/auth/me');
 
+export const deleteCurrentUser = () =>
+  API.delete('/auth/me');
 export const getPosts = (status, platform, brandId) =>
   API.get('/posts/', { params: { status, platform, brand_id: brandId } });
 

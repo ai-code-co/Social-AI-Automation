@@ -71,7 +71,7 @@ export default function Dashboard({ brand }) {
   };
 
   const stats = [
-    { label: 'Pending Approval', value: counts.pending, icon: Clock3, accent: 'text-amber-600', tint: 'bg-amber-50' },
+    { label: 'Pending', value: counts.pending, icon: Clock3, accent: 'text-amber-600', tint: 'bg-amber-50' },
     { label: 'Approved', value: counts.approved, icon: CheckCircle2, accent: 'text-emerald-600', tint: 'bg-emerald-50' },
     { label: 'Published', value: counts.published, icon: Rocket, accent: 'text-sky-600', tint: 'bg-sky-50' },
   ];
@@ -102,10 +102,10 @@ export default function Dashboard({ brand }) {
             Review generated copy for {brand.company_name}, approve ready posts, and keep every platform moving.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex">
+        <div className="grid grid-cols-2 gap-2 lg:flex">
           <button
             onClick={handleApproveAll}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15"
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15 sm:gap-2 sm:px-3"
           >
             <CheckCircle2 size={16} aria-hidden="true" />
             Approve All
@@ -113,7 +113,7 @@ export default function Dashboard({ brand }) {
           <button
             onClick={handleGenerateBatch}
             disabled={generating}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-medium text-white shadow-lg shadow-slate-950/15 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+            className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md bg-slate-950 px-2 text-xs font-medium text-white shadow-lg shadow-slate-950/15 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400 sm:gap-2 sm:px-3"
           >
             {generating ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <Wand2 size={16} aria-hidden="true" />}
             {generating ? 'Generating' : 'Generate Batch'}
@@ -121,18 +121,18 @@ export default function Dashboard({ brand }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {stats.map(stat => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-2xl font-semibold tracking-normal ${stat.accent}`}>{stat.value}</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
+            <div key={stat.label} className="min-w-0 rounded-lg border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-3">
+              <div className="flex min-w-0 items-center justify-between gap-1.5 sm:gap-3">
+                <div className="min-w-0">
+                  <p className={`text-xl font-semibold tracking-normal sm:text-2xl ${stat.accent}`}>{stat.value}</p>
+                  <p className="mt-1 truncate text-[0.65rem] text-slate-500 dark:text-slate-400 sm:text-xs">{stat.label}</p>
                 </div>
-                <div className={`grid size-9 place-items-center rounded-md ${stat.tint} ${stat.accent}`}>
-                  <Icon size={17} aria-hidden="true" />
+                <div className={`grid size-7 shrink-0 place-items-center rounded-md sm:size-9 ${stat.tint} ${stat.accent}`}>
+                  <Icon size={15} aria-hidden="true" />
                 </div>
               </div>
             </div>
