@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AtSign, BadgeCheck, Briefcase, ChevronDown, ExternalLink, KeyRound, Loader2, Save, Share2, ShieldCheck, Trash2 } from 'lucide-react';
 import { deleteSocialAccount, getInstagramOAuthUrl, getLinkedInOAuthUrl, getMetaOAuthUrl, getSocialAccounts, getXOAuthUrl, saveSocialAccount } from '../api';
+import SelectMenu from './SelectMenu';
 
 const emptyAccount = {
   platform: 'facebook',
@@ -41,6 +42,11 @@ const PLATFORM_COPY = {
     scopes: 'tweet.read tweet.write users.read offline.access',
   },
 };
+
+const PLATFORM_OPTIONS = Object.entries(PLATFORM_COPY).map(([value, copy]) => ({
+  value,
+  label: copy.label,
+}));
 
 const getAccountPlaceholder = (platform) => {
   if (platform === 'linkedin') return 'urn:li:person:abc123';
@@ -498,16 +504,11 @@ export default function SocialAccounts({ brand }) {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Platform</label>
-                <select
+                <SelectMenu
                   value={form.platform}
-                  onChange={e => changePlatform(e.target.value)}
-                  className="min-h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:bg-slate-900 dark:focus:ring-teal-500/20"
-                >
-                  <option value="facebook">Facebook Page</option>
-                  <option value="instagram">Instagram Business</option>
-                  <option value="linkedin">LinkedIn Profile</option>
-                  <option value="twitter">X Profile</option>
-                </select>
+                  options={PLATFORM_OPTIONS}
+                  onChange={changePlatform}
+                />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">

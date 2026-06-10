@@ -123,8 +123,8 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[300px_1fr] xl:grid-cols-[320px_1fr]">
-      <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+    <div className="grid min-w-0 gap-5 lg:grid-cols-[300px_1fr] xl:grid-cols-[320px_1fr]">
+      <aside className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-teal-700 dark:text-teal-300">Workspace</p>
@@ -139,7 +139,7 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
           </button>
         </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
+        <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:block lg:space-y-2">
           {brands.length === 0 ? (
             <div className="min-w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
               Add your first business or page to start creating separate brand memories and post queues.
@@ -149,7 +149,7 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
               <button
                 key={brand.id}
                 onClick={() => editBusiness(brand)}
-                className={`min-w-52 rounded-md border p-3 text-left transition lg:w-full lg:min-w-0 ${
+                className={`min-w-0 rounded-md border p-3 text-left transition lg:w-full ${
                   selectedBrand?.id === brand.id && mode !== 'new'
                     ? 'border-teal-200 bg-teal-50 text-slate-950 dark:border-teal-500/40 dark:bg-teal-500/10 dark:text-white'
                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800'
@@ -163,7 +163,7 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
         </div>
       </aside>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+      <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
         <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="grid size-10 shrink-0 place-items-center rounded-md bg-slate-950 text-white dark:bg-slate-800">
@@ -207,7 +207,7 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
           <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
             Choose where this business actually posts. Auto-generation and manual generation will only use these platforms.
           </p>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+          <div className="mt-3 flex flex-wrap gap-2">
             {PLATFORMS.map(platform => {
               const selected = getSelectedPlatforms().includes(platform);
               return (

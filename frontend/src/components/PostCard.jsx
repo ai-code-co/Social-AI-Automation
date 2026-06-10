@@ -135,13 +135,13 @@ export default function PostCard({ post, onRefresh }) {
   const showScheduleForm = canSchedulePost || (canReschedulePost && rescheduling);
 
   return (
-    <article className="flex min-h-72 flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-teal-500/40 dark:hover:shadow-black/20 sm:p-5">
+    <article className="flex min-h-64 flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg hover:shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-teal-500/40 dark:hover:shadow-black/20 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="grid size-9 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            <PlatformIcon size={17} aria-hidden="true" />
+          <div className="grid size-8 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <PlatformIcon size={15} aria-hidden="true" />
           </div>
-          <span className="truncate text-sm font-semibold capitalize text-slate-950 dark:text-white">{post.platform}</span>
+          <span className="truncate text-xs font-semibold capitalize text-slate-950 dark:text-white">{post.platform}</span>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {canEditPost && !editing && (
@@ -209,7 +209,7 @@ export default function PostCard({ post, onRefresh }) {
         </div>
       ) : (
         <div>
-          <p className={`${captionExpanded ? '' : 'line-clamp-5'} whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-slate-300`}>
+          <p className={`${captionExpanded ? '' : 'line-clamp-5'} whitespace-pre-line text-xs leading-5 text-slate-700 dark:text-slate-300`}>
             {post.caption}
           </p>
           {isLongCaption && (
@@ -225,7 +225,7 @@ export default function PostCard({ post, onRefresh }) {
       )}
 
       {!editing && post.hashtags && (
-        <p className="text-sm font-medium leading-6 text-teal-700">{post.hashtags}</p>
+        <p className="text-xs font-medium leading-5 text-teal-700">{post.hashtags}</p>
       )}
 
       {post.image_prompt && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Hash, Image, Loader2, Megaphone, PenLine, Send, Sparkles } from 'lucide-react';
 import { generatePost, getMediaUrl } from '../api';
+import SelectMenu from './SelectMenu';
 
 const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter'];
 
@@ -10,6 +11,8 @@ const getEnabledPlatforms = (brand) => (
     .map(platform => platform.trim().toLowerCase())
     .filter(Boolean)
 );
+
+const getPlatformLabel = (platform) => platform.charAt(0).toUpperCase() + platform.slice(1);
 
 export default function GeneratePost({ brand }) {
   const [form, setForm] = useState({
@@ -86,17 +89,14 @@ export default function GeneratePost({ brand }) {
               <Megaphone size={15} aria-hidden="true" />
               Platform
             </label>
-            <select
+            <SelectMenu
               value={form.platform}
-              onChange={e => setForm({ ...form, platform: e.target.value })}
-              className="min-h-11 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-950 outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:bg-slate-950 dark:focus:ring-teal-500/20"
-            >
-              {PLATFORMS.filter(p => enabledPlatforms.includes(p)).map(p => (
-                <option key={p} value={p}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </option>
-              ))}
-            </select>
+              options={PLATFORMS.filter(p => enabledPlatforms.includes(p)).map(p => ({
+                value: p,
+                label: getPlatformLabel(p),
+              }))}
+              onChange={platform => setForm({ ...form, platform })}
+            />
           </div>
 
           <div>
