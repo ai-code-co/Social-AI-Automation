@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
-export default function SelectMenu({ value, options, onChange }) {
+export default function SelectMenu({ value, options, onChange, showCheck = true }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
   const selected = options.find(option => option.value === value) || options[0];
@@ -27,7 +27,7 @@ export default function SelectMenu({ value, options, onChange }) {
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-56 min-w-0 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-950">
+        <div className="select-menu-scroll absolute left-0 right-0 top-full z-40 mt-1 max-h-56 min-w-0 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-950">
           {options.map(option => {
             const active = option.value === value;
             return (
@@ -45,7 +45,7 @@ export default function SelectMenu({ value, options, onChange }) {
                 }`}
               >
                 <span className="truncate">{option.label}</span>
-                {active && <Check className="shrink-0 text-teal-600 dark:text-teal-300" size={15} aria-hidden="true" />}
+                {showCheck && active && <Check className="shrink-0 text-teal-600 dark:text-teal-300" size={15} aria-hidden="true" />}
               </button>
             );
           })}

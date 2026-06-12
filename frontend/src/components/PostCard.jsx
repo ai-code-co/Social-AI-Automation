@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { AtSign, Briefcase, CalendarClock, Check, Clock, Edit3, ExternalLink, Globe2, Pause, Play, Save, Share2, Trash2, X } from 'lucide-react';
-import { approvePost, pausePost, resumePost, deletePost, getMediaUrl, updatePost } from '../api';
+import { AtSign, Briefcase, CalendarClock, Check, Clock, Copy, Edit3, ExternalLink, Globe2, Pause, Play, Save, Share2, Trash2, X } from 'lucide-react';
+import { approvePost, pausePost, resumePost, deletePost, duplicatePost, getMediaUrl, updatePost } from '../api';
+import ConfirmDialog from './ConfirmDialog';
 
 const parseScheduledAt = (value) => {
   if (!value) return null;
@@ -14,12 +15,33 @@ const toDateTimeLocalValue = (date) => {
   return localDate.toISOString().slice(0, 16);
 };
 
-export default function PostCard({ post, onRefresh }) {
+const PLATFORM_LABELS = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  linkedin: 'LinkedIn',
+  twitter: 'Twitter/X',
+};
+
+const getEnabledPlatforms = (brand) => (
+  (brand?.enabled_platforms || 'instagram,facebook,linkedin,twitter')
+    .split(',')
+    .map(platform => platform.trim().toLowerCase())
+    .filter(Boolean)
+);
+
+export default function PostCard({ post, brand, onRefresh }) {
   const initialScheduledAt = toDateTimeLocalValue(parseScheduledAt(post.scheduled_at));
   const [scheduledAt, setScheduledAt] = useState(initialScheduledAt);
   const [rescheduling, setRescheduling] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [duplicatePlatforms, setDuplicatePlatforms] = useState([]);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [imagePromptVisible, setImagePromptVisible] = useState(false);
   const [editCaption, setEditCaption] = useState(post.caption || '');
@@ -59,9 +81,60 @@ export default function PostCard({ post, onRefresh }) {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Delete this post?')) {
+    setDeleting(true);
+    setDeleteError('');
+    try {
       await deletePost(post.id);
+      setDeleteDialogOpen(false);
       onRefresh();
+    } catch (err) {
+      console.error(err);
+      setDeleteError(err.response?.data?.detail || 'Unable to delete this post. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const availableDuplicatePlatforms = getEnabledPlatforms(brand)
+    .filter(platform => platform !== post.platform && PLATFORM_LABELS[platform]);
+
+  const openDuplicateDialog = () => {
+    setDuplicatePlatforms([]);
+    setDuplicateError('');
+    setDuplicateDialogOpen(true);
+  };
+
+  const closeDuplicateDialog = () => {
+    if (duplicating) return;
+    setDuplicateDialogOpen(false);
+    setDuplicateError('');
+  };
+
+  const toggleDuplicatePlatform = (platform) => {
+    setDuplicatePlatforms(current => (
+      current.includes(platform)
+        ? current.filter(item => item !== platform)
+        : [...current, platform]
+    ));
+  };
+
+  const handleDuplicatePost = async () => {
+    if (duplicatePlatforms.length === 0) {
+      setDuplicateError('Choose at least one platform.');
+      return;
+    }
+
+    setDuplicating(true);
+    setDuplicateError('');
+    try {
+      await duplicatePost(post.id, { platforms: duplicatePlatforms });
+      setDuplicateDialogOpen(false);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      setDuplicateError(err.response?.data?.detail || 'Unable to copy this post. Please try again.');
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -145,6 +218,13 @@ export default function PostCard({ post, onRefresh }) {
           <span className="truncate text-xs font-semibold capitalize text-slate-950 dark:text-white">{post.platform}</span>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            onClick={openDuplicateDialog}
+            className="grid size-8 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"
+            title="Copy to another platform"
+          >
+            <Copy size={14} aria-hidden="true" />
+          </button>
           {canEditPost && !editing && (
             <button
               onClick={startEditing}
@@ -345,7 +425,10 @@ export default function PostCard({ post, onRefresh }) {
           </button>
         )}
         <button
-          onClick={handleDelete}
+          onClick={() => {
+            setDeleteError('');
+            setDeleteDialogOpen(true);
+          }}
           className="inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 text-xs font-medium text-rose-700 transition hover:bg-rose-100 sm:px-3"
         >
           <Trash2 size={14} aria-hidden="true" />
@@ -353,6 +436,105 @@ export default function PostCard({ post, onRefresh }) {
         </button>
       </div>
       )}
+
+      {duplicateDialogOpen && (
+        <div
+          className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/65 px-4 py-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`copy-post-title-${post.id}`}
+        >
+          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/30 dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-start gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-md bg-teal-50 text-teal-700 ring-1 ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-400/20">
+                <Copy size={18} aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h3 id={`copy-post-title-${post.id}`} className="text-base font-semibold text-slate-950 dark:text-white">
+                  Copy post to platform
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Choose where to create the same post as a new draft.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {availableDuplicatePlatforms.length === 0 ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-700 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">
+                  No other enabled platforms are available for this business.
+                </p>
+              ) : (
+                availableDuplicatePlatforms.map(platform => {
+                  const selected = duplicatePlatforms.includes(platform);
+                  return (
+                    <button
+                      key={platform}
+                      type="button"
+                      onClick={() => toggleDuplicatePlatform(platform)}
+                      className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-md border px-3 text-left text-sm font-medium transition ${
+                        selected
+                          ? 'border-teal-400 bg-teal-50 text-teal-800 dark:border-teal-400/40 dark:bg-teal-500/10 dark:text-teal-200'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{PLATFORM_LABELS[platform]}</span>
+                      <span className={`grid size-5 place-items-center rounded border ${
+                        selected
+                          ? 'border-teal-500 bg-teal-500 text-white'
+                          : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950'
+                      }`}>
+                        {selected && <Check size={13} aria-hidden="true" />}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {duplicateError && (
+              <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm leading-5 text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {duplicateError}
+              </p>
+            )}
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={closeDuplicateDialog}
+                disabled={duplicating}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDuplicatePost}
+                disabled={duplicating || availableDuplicatePlatforms.length === 0}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"
+              >
+                <Copy size={15} aria-hidden="true" />
+                {duplicating ? 'Copying...' : 'Create drafts'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete post?"
+        message={`This will permanently delete this ${post.platform} post from your workspace.`}
+        confirmLabel="Delete"
+        error={deleteError}
+        loading={deleting}
+        onCancel={() => {
+          if (deleting) return;
+          setDeleteDialogOpen(false);
+          setDeleteError('');
+        }}
+        onConfirm={handleDelete}
+      />
     </article>
   );
 }

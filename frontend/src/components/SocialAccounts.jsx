@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AtSign, BadgeCheck, Briefcase, ChevronDown, ExternalLink, KeyRound, Loader2, Save, Share2, ShieldCheck, Trash2 } from 'lucide-react';
 import { deleteSocialAccount, getInstagramOAuthUrl, getLinkedInOAuthUrl, getMetaOAuthUrl, getSocialAccounts, getXOAuthUrl, saveSocialAccount } from '../api';
+import ConfirmDialog from './ConfirmDialog';
 import SelectMenu from './SelectMenu';
 
 const emptyAccount = {
@@ -70,6 +71,9 @@ export default function SocialAccounts({ brand }) {
   const [connecting, setConnecting] = useState('');
   const [connectMessage, setConnectMessage] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const popupMonitorRef = useRef(null);
 
   const clearPopupMonitor = useCallback(() => {
@@ -213,9 +217,19 @@ export default function SocialAccounts({ brand }) {
   };
 
   const handleDisconnect = async (account) => {
-    if (!window.confirm(`Disconnect ${account.handle}?`)) return;
-    await deleteSocialAccount(account.id);
-    await refreshAccounts();
+    if (!account) return;
+    setDeletingAccount(true);
+    setDeleteError('');
+    try {
+      await deleteSocialAccount(account.id);
+      setAccountToDelete(null);
+      await refreshAccounts();
+    } catch (err) {
+      console.error(err);
+      setDeleteError(err.response?.data?.detail || 'Unable to disconnect this account. Please try again.');
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   const openOAuthPopup = (url, popupName, providerKey, providerLabel) => {
@@ -353,7 +367,10 @@ export default function SocialAccounts({ brand }) {
                         </div>
                       </div>
                       <button
-                        onClick={() => handleDisconnect(account)}
+                        onClick={() => {
+                          setDeleteError('');
+                          setAccountToDelete(account);
+                        }}
                         className="grid size-9 shrink-0 place-items-center rounded-md border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100"
                         title="Disconnect account"
                       >
@@ -555,6 +572,21 @@ export default function SocialAccounts({ brand }) {
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(accountToDelete)}
+        title="Disconnect account?"
+        message={`This will remove ${accountToDelete?.handle || 'this account'} from ${brand.company_name}. Scheduled posts for this platform will not publish until another account is connected.`}
+        confirmLabel="Disconnect"
+        error={deleteError}
+        loading={deletingAccount}
+        onCancel={() => {
+          if (deletingAccount) return;
+          setAccountToDelete(null);
+          setDeleteError('');
+        }}
+        onConfirm={() => handleDisconnect(accountToDelete)}
+      />
     </div>
   );
 }

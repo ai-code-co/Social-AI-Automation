@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BadgeCheck, Building2, Plus, Save, Trash2 } from 'lucide-react';
 import { createBrand, deleteBrand, updateBrand } from '../api';
+import ConfirmDialog from './ConfirmDialog';
 
 const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'twitter'];
 
@@ -19,6 +20,9 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
   const [form, setForm] = useState(emptyBusiness);
   const [mode, setMode] = useState('edit');
   const [saved, setSaved] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     if (mode === 'new') return;
@@ -79,14 +83,19 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
 
   const handleDelete = async () => {
     if (!selectedBrand) return;
-    if (!window.confirm(`Delete ${selectedBrand.company_name}? Businesses with posts cannot be deleted.`)) return;
 
+    setDeleting(true);
+    setDeleteError('');
     try {
       await deleteBrand(selectedBrand.id);
+      setDeleteDialogOpen(false);
       await onBrandsChange();
       setMode('edit');
     } catch (err) {
-      alert(err.response?.data?.detail || 'Unable to delete business');
+      console.error(err);
+      setDeleteError(err.response?.data?.detail || 'Unable to delete business');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -238,7 +247,10 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
           </button>
           {selectedBrand && mode !== 'new' && (
             <button
-              onClick={handleDelete}
+              onClick={() => {
+                setDeleteError('');
+                setDeleteDialogOpen(true);
+              }}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
             >
               <Trash2 size={17} aria-hidden="true" />
@@ -247,6 +259,21 @@ export default function BrandSettings({ brands, selectedBrand, onSelectBrand, on
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete business?"
+        message={`This will permanently delete ${selectedBrand?.company_name || 'this business'}. Businesses with posts cannot be deleted.`}
+        confirmLabel="Delete"
+        error={deleteError}
+        loading={deleting}
+        onCancel={() => {
+          if (deleting) return;
+          setDeleteDialogOpen(false);
+          setDeleteError('');
+        }}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

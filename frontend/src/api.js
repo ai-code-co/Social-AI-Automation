@@ -93,6 +93,9 @@ export const approvePost = (id) =>
 export const updatePost = (id, data) =>
   API.put(`/posts/${id}`, data);
 
+export const duplicatePost = (id, data) =>
+  API.post(`/posts/${id}/duplicate`, data);
+
 export const approveAll = (brandId) =>
   API.post('/posts/approve-all', null, { params: { brand_id: brandId } });
 
@@ -104,6 +107,9 @@ export const resumePost = (id) =>
 
 export const deletePost = (id) =>
   API.delete(`/posts/${id}`);
+
+export const getPerformanceSummary = (brandId) =>
+  API.get('/performance/summary', { params: { brand_id: brandId } });
 
 export const getBrand = () =>
   API.get('/brand/');

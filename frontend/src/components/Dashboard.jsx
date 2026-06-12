@@ -178,7 +178,7 @@ export default function Dashboard({ brand }) {
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {posts.map(post => (
-            <PostCard key={post.id} post={post} onRefresh={fetchPosts} />
+            <PostCard key={post.id} post={post} brand={brand} onRefresh={fetchPosts} />
           ))}
         </div>
       )}
